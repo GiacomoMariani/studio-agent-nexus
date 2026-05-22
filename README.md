@@ -1248,6 +1248,19 @@ The HTTP client handles:
 
 ---
 
+## Answer Modes and Demo Behavior
+
+The app supports a safe local answering mode by default and an optional OpenAI-backed document QA mode.
+
+- `DOCUMENT_ANSWERER_TYPE=rule` uses the deterministic rule-based answerer.
+- `DOCUMENT_ANSWERER_TYPE=llm` enables prompt-based document answering.
+- `DOCUMENT_QA_MODEL_CLIENT_TYPE=openai` uses the OpenAI-backed model client.
+- `DOCUMENT_QA_FALLBACK_TO_RULE=true` keeps the app safe by falling back to the rule-based answerer if the LLM is unavailable, returns an unsupported answer, or fails citation validation.
+
+The Streamlit UI shows which answer mode is active so demo viewers can tell whether answers are local, simulated, or OpenAI-backed.
+
+The demo knowledge base includes structured answer polish for common portfolio questions such as order status, paid delivered orders, package features, and ownership lookup. Citations are grouped by source file/page to reduce duplicate source cards while preserving detailed retrieval logs in the admin query-log view.
+
 
 ## Development Philosophy
 

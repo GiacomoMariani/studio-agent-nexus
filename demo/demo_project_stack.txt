@@ -1,0 +1,15 @@
+Project stack facts
+
+Backend framework: FastAPI.
+
+Visitor/admin interface: Streamlit.
+
+Local database: SQLite.
+
+Search approach: local embeddings with hybrid retrieval scoring.
+
+Automated testing tool: Pytest.
+
+Local deployment packaging: Docker.
+
+Optional LLM mode: OpenAI-backed document QA can be enabled through environment variables, with rule-based fallback available for safety.
