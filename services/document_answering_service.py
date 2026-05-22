@@ -288,6 +288,14 @@ def _polish_answer_response(
             question=question,
             text=source_text,
         )
+        or _format_order_owner_answer(
+            question=question,
+            text=source_text,
+        )
+        or _format_single_bullet_package_answer(
+            question=question,
+            answer=answer_response.answer,
+        )
     )
 
     if polished_answer is None:
@@ -297,6 +305,46 @@ def _polish_answer_response(
         answer=polished_answer,
         was_fallback=False,
     )
+
+
+def _format_single_bullet_package_answer(question: str, answer: str) -> str | None:
+    question_text = question.lower()
+
+    if not (
+        "which package" in question_text
+        and "includes" in question_text
+    ):
+        return None
+
+    cleaned_lines = [
+        re.sub(r"^\s*[-*•]\s+", "", line.strip())
+        for line in answer.strip().splitlines()
+        if line.strip()
+    ]
+
+    if len(cleaned_lines) != 1:
+        return None
+
+    line = cleaned_lines[0]
+
+    if " package includes " in line.lower():
+        return line
+
+    match = re.match(
+        r"(?P<package>[A-Z][A-Za-z0-9 &/-]+?)\s+includes\s+(?P<feature>.+)$",
+        line,
+    )
+
+    if match is None:
+        return None
+
+    package_name = match.group("package").strip()
+    feature = match.group("feature").strip()
+
+    if not feature.endswith("."):
+        feature += "."
+
+    return f"The {package_name} package includes {feature}"
 
 
 def _format_order_ledger_answer(question: str, text: str) -> str | None:
@@ -442,6 +490,69 @@ def _format_delivered_paid_count_answer(question: str, text: str) -> str | None:
         )
 
     return "\n".join(lines)
+
+
+def _format_order_owner_answer(question: str, text: str) -> str | None:
+    question_text = question.lower()
+
+    if not (
+        "order" in question_text
+        and ("own" in question_text or "owner" in question_text)
+    ):
+        return None
+
+    order_id_match = re.search(
+        r"ORD-\d{4}-\d{4}",
+        question,
+        flags=re.IGNORECASE,
+    )
+    requested_order_id = (
+        order_id_match.group(0).upper()
+        if order_id_match is not None
+        else None
+    )
+
+    customer_match = re.search(
+        r"\bfor\s+(?P<customer>.+?)(?:\?|$)",
+        question,
+        flags=re.IGNORECASE,
+    )
+    requested_customer = (
+        customer_match.group("customer").strip().lower()
+        if customer_match is not None
+        else None
+    )
+
+    ledger_rows = re.findall(
+        r"ORD-\d{4}-\d{4}\s*\|[^\n\r]+",
+        text,
+    )
+
+    for row in ledger_rows:
+        parts = [part.strip() for part in row.split("|")]
+
+        if len(parts) < 10:
+            continue
+
+        order_id = parts[0]
+        customer = parts[2]
+        owner = parts[8]
+
+        order_id_matches = (
+            requested_order_id is not None
+            and order_id.upper() == requested_order_id
+        )
+        customer_matches = (
+            requested_customer is not None
+            and customer.lower() == requested_customer
+        )
+
+        if not (order_id_matches or customer_matches):
+            continue
+
+        return f"The order for {customer} is owned by {owner}."
+
+    return None
 
 
 def _requires_fallback_due_to_missing_citations(

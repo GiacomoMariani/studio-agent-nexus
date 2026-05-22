@@ -91,6 +91,7 @@ CUSTOM_CSS = """
     .chat-focus strong {
         color: #0f172a;
     }
+
     .section-card {
         padding: 1rem 1.1rem;
         border: 1px solid #e5e7eb;
@@ -347,7 +348,6 @@ def submit_question(question: str) -> bool:
 # UI helpers
 # ---------------------------------------------------------------------
 
-
 def render_answer_mode_notice() -> None:
     answerer_type = os.getenv("DOCUMENT_ANSWERER_TYPE", "rule").strip().lower()
     model_client_type = os.getenv("DOCUMENT_QA_MODEL_CLIENT_TYPE", "fake").strip().lower()
@@ -394,25 +394,107 @@ def render_workflow_step(number: int, title: str, body: str) -> None:
     )
 
 
+def group_citations_by_source(
+        citations: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    grouped: dict[tuple[str, Any], dict[str, Any]] = {}
+
+    for citation in citations:
+        filename = citation.get("filename", "Unknown source")
+        page_number = citation.get("page_number")
+        key = (filename, page_number)
+        snippet = citation.get("snippet", "No snippet available.")
+        score = citation.get("hybrid_score")
+
+        if key not in grouped:
+            grouped[key] = {
+                "filename": filename,
+                "page_number": page_number,
+                "snippets": [],
+                "hybrid_score": score if isinstance(score, (int, float)) else None,
+            }
+
+        if snippet not in grouped[key]["snippets"]:
+            grouped[key]["snippets"].append(snippet)
+
+        current_score = grouped[key].get("hybrid_score")
+        if isinstance(score, (int, float)) and (
+                current_score is None
+                or score > current_score
+        ):
+            grouped[key]["hybrid_score"] = score
+
+    return sorted(
+        grouped.values(),
+        key=lambda source: (
+            source.get("hybrid_score") is not None,
+            source.get("hybrid_score") or 0,
+        ),
+        reverse=True,
+    )
+
+
 def show_sources(citations: list[dict[str, Any]]) -> None:
     if not citations:
         st.caption("No citations returned for this answer.")
         return
 
+    source_groups = group_citations_by_source(citations)
+
+    if not source_groups:
+        st.caption("No citations returned for this answer.")
+        return
+
+    best_score = source_groups[0].get("hybrid_score")
+
+    if isinstance(best_score, (int, float)):
+        score_cutoff = best_score * 0.90
+
+        visible_sources = [
+            source
+            for source in source_groups
+            if isinstance(source.get("hybrid_score"), (int, float))
+            and source["hybrid_score"] >= score_cutoff
+        ][:2]
+    else:
+        visible_sources = source_groups[:1]
+
+    if not visible_sources:
+        visible_sources = source_groups[:1]
+
+    hidden_source_count = len(source_groups) - len(visible_sources)
+
     st.markdown("#### Grounding sources")
 
-    for cite in citations:
-        page = cite.get("page_number")
+    for source in visible_sources:
+        page = source.get("page_number")
         page_text = f", page {page}" if page else ""
-        filename = cite.get("filename", "Unknown source")
+        filename = source.get("filename", "Unknown source")
         title = f"{filename}{page_text}"
+        snippets = source.get("snippets", [])
 
         with st.expander(title):
-            st.write(cite.get("snippet", "No snippet available."))
+            if len(snippets) <= 1:
+                st.write(snippets[0] if snippets else "No snippet available.")
+            else:
+                for index, snippet in enumerate(snippets[:3], start=1):
+                    st.markdown(f"**Excerpt {index}**")
+                    st.write(snippet)
 
-            score = cite.get("hybrid_score")
+                if len(snippets) > 3:
+                    st.caption(
+                        f"{len(snippets) - 3} additional retrieved excerpts hidden."
+                    )
+
+            score = source.get("hybrid_score")
             if isinstance(score, (int, float)):
-                st.caption(f"Retrieval score: {score:.3f}")
+                st.caption(f"Best retrieval score: {score:.3f}")
+
+    if hidden_source_count > 0:
+        st.caption(
+            f"{hidden_source_count} lower-ranked source group hidden. "
+            "Full retrieval details are available in the query logs."
+        )
 
 
 def render_latest_answer(answer_item: dict[str, Any]) -> None:
