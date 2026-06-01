@@ -5,63 +5,60 @@ import urllib.request
 from typing import Any
 
 
-ORDER_FIXTURES: dict[str, dict[str, Any]] = {
-    "ORD-123": {
-        "status": "shipped",
-        "estimated_delivery": "2026-05-02",
-        "refund_eligible": True,
-        "refund_reason": "The order has not been delivered yet.",
+TASK_FIXTURES: dict[str, dict[str, Any]] = {
+    "TASK-001": {
+        "status": "in_progress",
+        "department": "Code",
+        "priority": "High",
+        "assignable": True,
+        "notes": "Combat state machine refactor — currently in active development.",
     },
-    "ORD-456": {
-        "status": "processing",
-        "estimated_delivery": "2026-05-05",
-        "refund_eligible": True,
-        "refund_reason": "The order is still processing.",
+    "TASK-002": {
+        "status": "blocked",
+        "department": "Art",
+        "priority": "Medium",
+        "assignable": False,
+        "notes": "Blocked pending finalised hitbox spec from Design.",
     },
-    "ORD-789": {
-        "status": "delivered",
-        "estimated_delivery": "2026-04-20",
-        "refund_eligible": False,
-        "refund_reason": "The order has already been delivered.",
+    "TASK-003": {
+        "status": "completed",
+        "department": "QA",
+        "priority": "Critical",
+        "assignable": False,
+        "notes": "Critical combat regression resolved in build 47.",
     },
 }
 
 
-class LocalOrderClient:
-    def __init__(self, orders: dict[str, dict[str, Any]] | None = None):
-        self._orders = ORDER_FIXTURES if orders is None else orders
-
-    def get_order(self, order_id: str) -> dict[str, Any] | None:
-        normalized_order_id = order_id.upper()
-        order = self._orders.get(normalized_order_id)
-
-        if order is None:
-            return None
-
-        return dict(order)
-
-
-import json
-import urllib.error
-import urllib.request
-from typing import Any
-
-
-class OrderClientError(Exception):
+class GameProjectClientError(Exception):
     pass
 
 
-class HttpOrderClient:
+class LocalGameProjectClient:
+    def __init__(self, tasks: dict[str, dict[str, Any]] | None = None):
+        self._tasks = TASK_FIXTURES if tasks is None else tasks
+
+    def get_task(self, task_id: str) -> dict[str, Any] | None:
+        normalized_task_id = task_id.upper()
+        task = self._tasks.get(normalized_task_id)
+
+        if task is None:
+            return None
+
+        return dict(task)
+
+
+class HttpGameProjectClient:
     RETRYABLE_STATUS_CODES = {429, 500, 502, 503, 504}
 
     def __init__(
-            self,
-            base_url: str,
-            api_key: str | None = None,
-            timeout_seconds: float = 5.0,
-            max_retries: int = 2,
-            retry_delay_seconds: float = 0.25,
-            max_retry_delay_seconds: float = 5.0,
+        self,
+        base_url: str,
+        api_key: str | None = None,
+        timeout_seconds: float = 5.0,
+        max_retries: int = 2,
+        retry_delay_seconds: float = 0.25,
+        max_retry_delay_seconds: float = 5.0,
     ) -> None:
         self.base_url = base_url.rstrip("/")
         self.api_key = api_key
@@ -70,13 +67,11 @@ class HttpOrderClient:
         self.retry_delay_seconds = retry_delay_seconds
         self.max_retry_delay_seconds = max_retry_delay_seconds
 
-    def get_order(self, order_id: str) -> dict[str, Any] | None:
-        normalized_order_id = order_id.upper()
-        url = f"{self.base_url}/orders/{normalized_order_id}"
+    def get_task(self, task_id: str) -> dict[str, Any] | None:
+        normalized_task_id = task_id.upper()
+        url = f"{self.base_url}/tasks/{normalized_task_id}"
 
-        headers = {
-            "Accept": "application/json",
-        }
+        headers = {"Accept": "application/json"}
 
         if self.api_key is not None:
             headers["Authorization"] = f"Bearer {self.api_key}"
@@ -109,8 +104,8 @@ class HttpOrderClient:
                     self._wait_before_retry(retry_delay_seconds)
                     continue
 
-                raise OrderClientError(
-                    f"Order API returned HTTP {ex.code}."
+                raise GameProjectClientError(
+                    f"Game project API returned HTTP {ex.code}."
                 ) from ex
 
             except urllib.error.URLError as ex:
@@ -118,16 +113,16 @@ class HttpOrderClient:
                     self._wait_before_retry(self.retry_delay_seconds)
                     continue
 
-                raise OrderClientError(
-                    "Order API request failed."
+                raise GameProjectClientError(
+                    "Game project API request failed."
                 ) from ex
 
             except json.JSONDecodeError as ex:
-                raise OrderClientError(
-                    "Order API returned invalid JSON."
+                raise GameProjectClientError(
+                    "Game project API returned invalid JSON."
                 ) from ex
 
-        raise OrderClientError("Order API request failed after retries.")
+        raise GameProjectClientError("Game project API request failed after retries.")
 
     def _should_retry_http_error(
         self,
@@ -147,10 +142,7 @@ class HttpOrderClient:
     ) -> bool:
         return attempt_number < total_attempts
 
-    def _get_retry_delay_seconds(
-            self,
-            error: urllib.error.HTTPError,
-    ) -> float:
+    def _get_retry_delay_seconds(self, error: urllib.error.HTTPError) -> float:
         if error.code != 429:
             return self.retry_delay_seconds
 
@@ -172,62 +164,52 @@ class HttpOrderClient:
 
         return min(retry_after_seconds, self.max_retry_delay_seconds)
 
-        return min(retry_after_seconds, self.max_retry_delay_seconds)
-
     def _wait_before_retry(self, delay_seconds: float) -> None:
         if delay_seconds > 0:
             time.sleep(delay_seconds)
 
-class FallbackOrderClient:
-    def __init__(
-        self,
-        primary_client: Any,
-        fallback_client: Any,
-    ):
+
+class FallbackGameProjectClient:
+    def __init__(self, primary_client: Any, fallback_client: Any):
         self.primary_client = primary_client
         self.fallback_client = fallback_client
 
-    def get_order(self, order_id: str) -> dict[str, Any] | None:
+    def get_task(self, task_id: str) -> dict[str, Any] | None:
         try:
-            return self.primary_client.get_order(order_id)
-        except OrderClientError:
-            return self.fallback_client.get_order(order_id)
+            return self.primary_client.get_task(task_id)
+        except GameProjectClientError:
+            return self.fallback_client.get_task(task_id)
 
-def create_order_client(
+
+def create_game_project_client(
     client_type: str = "local",
     base_url: str | None = None,
     api_key: str | None = None,
-) -> LocalOrderClient | HttpOrderClient | FallbackOrderClient:
+) -> LocalGameProjectClient | HttpGameProjectClient | FallbackGameProjectClient:
     normalized_client_type = client_type.lower()
 
     if normalized_client_type == "local":
-        return LocalOrderClient()
+        return LocalGameProjectClient()
 
     if normalized_client_type == "http":
         if not base_url:
-            raise OrderClientError(
-                "ORDER_API_BASE_URL is required when ORDER_CLIENT_TYPE=http."
+            raise GameProjectClientError(
+                "GAME_PROJECT_API_BASE_URL is required when "
+                "GAME_PROJECT_CLIENT_TYPE=http."
             )
-
-        return HttpOrderClient(
-            base_url=base_url,
-            api_key=api_key,
-        )
+        return HttpGameProjectClient(base_url=base_url, api_key=api_key)
 
     if normalized_client_type == "http_with_fallback":
         if not base_url:
-            raise OrderClientError(
-                "ORDER_API_BASE_URL is required when ORDER_CLIENT_TYPE=http_with_fallback."
+            raise GameProjectClientError(
+                "GAME_PROJECT_API_BASE_URL is required when "
+                "GAME_PROJECT_CLIENT_TYPE=http_with_fallback."
             )
-
-        return FallbackOrderClient(
-            primary_client=HttpOrderClient(
-                base_url=base_url,
-                api_key=api_key,
-            ),
-            fallback_client=LocalOrderClient(),
+        return FallbackGameProjectClient(
+            primary_client=HttpGameProjectClient(base_url=base_url, api_key=api_key),
+            fallback_client=LocalGameProjectClient(),
         )
 
-    raise OrderClientError(
-        f"Unsupported order client type: {client_type}"
+    raise GameProjectClientError(
+        f"Unsupported game project client type: {client_type}"
     )

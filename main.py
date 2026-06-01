@@ -134,7 +134,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="Business RAG Knowledge-Base Chatbot",
+    title="Studio Agent Nexus",
     lifespan=lifespan,
 )
 

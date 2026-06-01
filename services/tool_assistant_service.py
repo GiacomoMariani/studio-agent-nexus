@@ -1,21 +1,21 @@
 import re
 from typing import Any
 
-from tools.order_tools import (
-    check_refund_eligibility,
-    confirm_pending_refund_request,
-    create_pending_refund_request,
-    get_order_status,
+from tools.production_tools import (
+    check_task_blockers,
+    confirm_pending_task_update,
+    create_pending_task_update,
+    get_task_status,
 )
 
 
-ORDER_ID_PATTERN = re.compile(r"\bORD-\d+\b", re.IGNORECASE)
+TASK_ID_PATTERN = re.compile(r"\bTASK-\d+\b", re.IGNORECASE)
 PENDING_ACTION_PATTERN = re.compile(r"\bPEND-\d+\b", re.IGNORECASE)
 
-TOOL_GET_ORDER_STATUS = "get_order_status"
-TOOL_CHECK_REFUND_ELIGIBILITY = "check_refund_eligibility"
-TOOL_CREATE_PENDING_REFUND_REQUEST = "create_pending_refund_request"
-TOOL_CONFIRM_PENDING_REFUND_REQUEST = "confirm_pending_refund_request"
+TOOL_GET_TASK_STATUS = "get_task_status"
+TOOL_CHECK_TASK_BLOCKERS = "check_task_blockers"
+TOOL_CREATE_PENDING_TASK_UPDATE = "create_pending_task_update"
+TOOL_CONFIRM_PENDING_TASK_UPDATE = "confirm_pending_task_update"
 
 
 class ToolAssistantService:
@@ -23,65 +23,65 @@ class ToolAssistantService:
         pending_action_id = self._extract_pending_action_id(message)
 
         if pending_action_id and self._is_confirmation(message):
-            return self._handle_pending_refund_confirmation(pending_action_id)
+            return self._handle_pending_task_confirmation(pending_action_id)
 
-        order_id = self._extract_order_id(message)
+        task_id = self._extract_task_id(message)
 
-        if order_id is None:
+        if task_id is None:
             return self._build_response(
-                answer="Please provide an order ID so I can help with your request.",
+                answer="Please provide a task ID so I can help with your request.",
                 tool_calls=[],
             )
 
-        if self._is_refund_creation_request(message):
-            return self._handle_pending_refund_creation(order_id)
+        if self._is_update_request(message):
+            return self._handle_pending_task_creation(task_id)
 
-        if self._is_refund_question(message):
-            tool_result = check_refund_eligibility(order_id)
+        if self._is_blocker_question(message):
+            tool_result = check_task_blockers(task_id)
 
             return self._build_response(
-                answer=self._format_refund_answer(tool_result),
+                answer=self._format_blocker_answer(tool_result),
                 tool_calls=[
                     {
-                        "tool_name": TOOL_CHECK_REFUND_ELIGIBILITY,
+                        "tool_name": TOOL_CHECK_TASK_BLOCKERS,
                         "result": tool_result,
                     }
                 ],
             )
 
-        tool_result = get_order_status(order_id)
+        tool_result = get_task_status(task_id)
 
         return self._build_response(
             answer=self._format_status_answer(tool_result),
             tool_calls=[
                 {
-                    "tool_name": TOOL_GET_ORDER_STATUS,
+                    "tool_name": TOOL_GET_TASK_STATUS,
                     "result": tool_result,
                 }
             ],
         )
 
-    def _handle_pending_refund_creation(self, order_id: str) -> dict[str, Any]:
-        tool_result = create_pending_refund_request(order_id)
+    def _handle_pending_task_creation(self, task_id: str) -> dict[str, Any]:
+        tool_result = create_pending_task_update(task_id)
 
         return self._build_response(
-            answer=self._format_pending_refund_creation_answer(tool_result),
+            answer=self._format_pending_task_creation_answer(tool_result),
             tool_calls=[
                 {
-                    "tool_name": TOOL_CREATE_PENDING_REFUND_REQUEST,
+                    "tool_name": TOOL_CREATE_PENDING_TASK_UPDATE,
                     "result": tool_result,
                 }
             ],
         )
 
-    def _handle_pending_refund_confirmation(self, pending_action_id: str) -> dict[str, Any]:
-        tool_result = confirm_pending_refund_request(pending_action_id)
+    def _handle_pending_task_confirmation(self, pending_action_id: str) -> dict[str, Any]:
+        tool_result = confirm_pending_task_update(pending_action_id)
 
         return self._build_response(
-            answer=self._format_pending_refund_confirmation_answer(tool_result),
+            answer=self._format_pending_task_confirmation_answer(tool_result),
             tool_calls=[
                 {
-                    "tool_name": TOOL_CONFIRM_PENDING_REFUND_REQUEST,
+                    "tool_name": TOOL_CONFIRM_PENDING_TASK_UPDATE,
                     "result": tool_result,
                 }
             ],
@@ -101,8 +101,8 @@ class ToolAssistantService:
             "tool_calls": tool_calls,
         }
 
-    def _extract_order_id(self, message: str) -> str | None:
-        match = ORDER_ID_PATTERN.search(message)
+    def _extract_task_id(self, message: str) -> str | None:
+        match = TASK_ID_PATTERN.search(message)
 
         if match is None:
             return None
@@ -130,61 +130,61 @@ class ToolAssistantService:
 
         return any(term in normalized_message for term in confirmation_terms)
 
-    def _is_refund_question(self, message: str) -> bool:
+    def _is_blocker_question(self, message: str) -> bool:
         normalized_message = message.lower()
 
-        refund_terms = [
-            "refund",
-            "money back",
-            "return",
-            "cancel",
+        blocker_terms = [
+            "blocked",
+            "blocker",
+            "blocking",
+            "can i assign",
+            "assignable",
         ]
 
-        return any(term in normalized_message for term in refund_terms)
+        return any(term in normalized_message for term in blocker_terms)
 
-    def _is_refund_creation_request(self, message: str) -> bool:
+    def _is_update_request(self, message: str) -> bool:
         normalized_message = message.lower()
 
-        creation_terms = [
-            "i want a refund",
-            "i need a refund",
-            "request a refund",
-            "submit a refund",
-            "create a refund",
-            "start a refund",
-            "please refund",
-            "refund my order",
-            "refund this order",
+        update_terms = [
+            "update this task",
+            "update task",
+            "mark as done",
+            "mark complete",
+            "close this task",
+            "close task",
+            "submit an update",
         ]
 
-        return any(term in normalized_message for term in creation_terms)
+        return any(term in normalized_message for term in update_terms)
 
     def _format_status_answer(self, tool_result: dict[str, object]) -> str:
         if not tool_result["found"]:
-            return f"I could not find order {tool_result['order_id']}."
+            return f"I could not find task {tool_result['task_id']}."
 
         return (
-            f"Order {tool_result['order_id']} is currently "
-            f"{tool_result['status']}. Estimated delivery is "
-            f"{tool_result['estimated_delivery']}."
+            f"Task {tool_result['task_id']} is currently {tool_result['status']}. "
+            f"Department: {tool_result['department']}. "
+            f"Priority: {tool_result['priority']}. "
+            f"Notes: {tool_result['notes']}"
         )
 
-    def _format_refund_answer(self, tool_result: dict[str, object]) -> str:
+    def _format_blocker_answer(self, tool_result: dict[str, object]) -> str:
         if not tool_result["found"]:
-            return f"I could not find order {tool_result['order_id']}."
+            return f"I could not find task {tool_result['task_id']}."
 
-        if tool_result["eligible"]:
+        if tool_result["blocked"]:
             return (
-                f"Order {tool_result['order_id']} appears to be eligible "
-                f"for a refund. Reason: {tool_result['reason']}"
+                f"Task {tool_result['task_id']} is currently blocked and cannot be "
+                f"assigned. Reason: {tool_result['reason']}"
             )
 
         return (
-            f"Order {tool_result['order_id']} does not appear to be eligible "
-            f"for a refund. Reason: {tool_result['reason']}"
+            f"Task {tool_result['task_id']} has no blockers and is assignable. "
+            f"Notes: {tool_result['reason']}"
         )
 
-    def _format_pending_refund_creation_answer(
+    def _format_pending_task_creation_answer(
         self,
         tool_result: dict[str, object],
     ) -> str:
@@ -192,12 +192,12 @@ class ToolAssistantService:
             return str(tool_result["message"])
 
         return (
-            f"Order {tool_result['order_id']} is eligible for a refund. "
+            f"Task {tool_result['task_id']} is ready for an update. "
             f"Please confirm {tool_result['pending_action_id']} if you want me "
-            f"to submit the refund request."
+            f"to submit the task update."
         )
 
-    def _format_pending_refund_confirmation_answer(
+    def _format_pending_task_confirmation_answer(
         self,
         tool_result: dict[str, object],
     ) -> str:
@@ -205,6 +205,6 @@ class ToolAssistantService:
             return str(tool_result["message"])
 
         return (
-            f"Refund request {tool_result['refund_request_id']} has been submitted "
-            f"for order {tool_result['order_id']}."
+            f"Task update {tool_result['update_id']} has been submitted "
+            f"for task {tool_result['task_id']}."
         )

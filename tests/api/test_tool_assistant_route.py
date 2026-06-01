@@ -7,45 +7,45 @@ client = TestClient(app)
 AUTH_HEADERS = {"X-API-Key": "test-secret-key"}
 
 
-def test_tool_assistant_returns_order_status():
+def test_tool_assistant_returns_task_status():
     response = client.post(
         "/tool-assistant",
         headers=AUTH_HEADERS,
-        json={"message": "Where is ORD-123?"},
+        json={"message": "What is the status of TASK-001?"},
     )
 
     assert response.status_code == 200
 
     payload = response.json()
-    assert payload["tool_called"] == "get_order_status"
+    assert payload["tool_called"] == "get_task_status"
     assert payload["tool_result"]["found"] is True
-    assert payload["tool_result"]["order_id"] == "ORD-123"
-    assert payload["tool_result"]["status"] == "shipped"
-    assert "currently shipped" in payload["answer"]
+    assert payload["tool_result"]["task_id"] == "TASK-001"
+    assert payload["tool_result"]["status"] == "in_progress"
+    assert "currently in_progress" in payload["answer"]
 
 
-def test_tool_assistant_checks_refund_eligibility():
+def test_tool_assistant_checks_task_blockers():
     response = client.post(
         "/tool-assistant",
         headers=AUTH_HEADERS,
-        json={"message": "Can I get a refund for ORD-789?"},
+        json={"message": "Is TASK-002 blocked?"},
     )
 
     assert response.status_code == 200
 
     payload = response.json()
-    assert payload["tool_called"] == "check_refund_eligibility"
+    assert payload["tool_called"] == "check_task_blockers"
     assert payload["tool_result"]["found"] is True
-    assert payload["tool_result"]["order_id"] == "ORD-789"
-    assert payload["tool_result"]["eligible"] is False
-    assert "does not appear to be eligible" in payload["answer"]
+    assert payload["tool_result"]["task_id"] == "TASK-002"
+    assert payload["tool_result"]["blocked"] is True
+    assert "blocked" in payload["answer"]
 
 
-def test_tool_assistant_asks_for_order_id_when_missing():
+def test_tool_assistant_asks_for_task_id_when_missing():
     response = client.post(
         "/tool-assistant",
         headers=AUTH_HEADERS,
-        json={"message": "Where is my order?"},
+        json={"message": "What is the status of my task?"},
     )
 
     assert response.status_code == 200
@@ -53,50 +53,49 @@ def test_tool_assistant_asks_for_order_id_when_missing():
     payload = response.json()
     assert payload["tool_called"] is None
     assert payload["tool_result"] is None
-    assert payload["answer"] == "Please provide an order ID so I can help with your request."
+    assert payload["answer"] == "Please provide a task ID so I can help with your request."
 
 
 def test_tool_assistant_requires_api_key():
     response = client.post(
         "/tool-assistant",
-        json={"message": "Where is ORD-123?"},
+        json={"message": "What is the status of TASK-001?"},
     )
 
     assert response.status_code == 401
-    assert response.json() == {
-        "detail": "Invalid or missing API key."
-    }
+    assert response.json() == {"detail": "Invalid or missing API key."}
 
-def test_tool_assistant_creates_pending_refund_request_when_eligible():
+
+def test_tool_assistant_creates_pending_task_update_when_assignable():
     response = client.post(
         "/tool-assistant",
         headers=AUTH_HEADERS,
-        json={"message": "I want to request a refund for ORD-123."},
+        json={"message": "Please update task TASK-001."},
     )
 
     assert response.status_code == 200
 
     payload = response.json()
 
-    assert payload["tool_called"] == "create_pending_refund_request"
+    assert payload["tool_called"] == "create_pending_task_update"
     assert payload["tool_result"]["created"] is True
-    assert payload["tool_result"]["order_id"] == "ORD-123"
+    assert payload["tool_result"]["task_id"] == "TASK-001"
     assert payload["tool_result"]["status"] == "pending_confirmation"
     assert payload["tool_result"]["pending_action_id"].startswith("PEND-")
 
     assert len(payload["tool_calls"]) == 1
-    assert payload["tool_calls"][0]["tool_name"] == "create_pending_refund_request"
+    assert payload["tool_calls"][0]["tool_name"] == "create_pending_task_update"
     assert payload["tool_calls"][0]["result"]["created"] is True
 
     assert "Please confirm" in payload["answer"]
-    assert "if you want me to submit the refund request" in payload["answer"]
+    assert "if you want me to submit the task update" in payload["answer"]
 
 
-def test_tool_assistant_confirms_pending_refund_request():
+def test_tool_assistant_confirms_pending_task_update():
     setup_response = client.post(
         "/tool-assistant",
         headers=AUTH_HEADERS,
-        json={"message": "I want to request a refund for ORD-456."},
+        json={"message": "Please update task TASK-001."},
     )
 
     assert setup_response.status_code == 200
@@ -114,36 +113,36 @@ def test_tool_assistant_confirms_pending_refund_request():
 
     payload = confirm_response.json()
 
-    assert payload["tool_called"] == "confirm_pending_refund_request"
+    assert payload["tool_called"] == "confirm_pending_task_update"
     assert payload["tool_result"]["confirmed"] is True
     assert payload["tool_result"]["pending_action_id"] == pending_action_id
-    assert payload["tool_result"]["order_id"] == "ORD-456"
-    assert payload["tool_result"]["refund_request_id"].startswith("REF-")
+    assert payload["tool_result"]["task_id"] == "TASK-001"
+    assert payload["tool_result"]["update_id"].startswith("UPD-")
 
     assert len(payload["tool_calls"]) == 1
-    assert payload["tool_calls"][0]["tool_name"] == "confirm_pending_refund_request"
+    assert payload["tool_calls"][0]["tool_name"] == "confirm_pending_task_update"
 
-    assert "Refund request" in payload["answer"]
+    assert "Task update" in payload["answer"]
     assert "has been submitted" in payload["answer"]
 
 
-def test_tool_assistant_does_not_create_pending_refund_request_when_ineligible():
+def test_tool_assistant_does_not_create_pending_update_when_not_assignable():
     response = client.post(
         "/tool-assistant",
         headers=AUTH_HEADERS,
-        json={"message": "I want to request a refund for ORD-789."},
+        json={"message": "Please update task TASK-002."},
     )
 
     assert response.status_code == 200
 
     payload = response.json()
 
-    assert payload["tool_called"] == "create_pending_refund_request"
+    assert payload["tool_called"] == "create_pending_task_update"
     assert payload["tool_result"]["created"] is False
-    assert payload["tool_result"]["order_id"] == "ORD-789"
+    assert payload["tool_result"]["task_id"] == "TASK-002"
 
     assert len(payload["tool_calls"]) == 1
-    assert payload["tool_calls"][0]["tool_name"] == "create_pending_refund_request"
+    assert payload["tool_calls"][0]["tool_name"] == "create_pending_task_update"
     assert payload["tool_calls"][0]["result"]["created"] is False
 
-    assert "could not be created" in payload["answer"]
+    assert "could not be staged" in payload["answer"]

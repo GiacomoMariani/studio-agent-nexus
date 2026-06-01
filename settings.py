@@ -50,9 +50,9 @@ def _get_bool_env(name: str, default: bool) -> bool:
 @dataclass(frozen=True)
 class Settings:
     extractor_type: str = "rule"
-    order_client_type: str = "local"
-    order_api_base_url: str | None = None
-    order_api_key: str | None = None
+    game_project_client_type: str = "local"
+    game_project_api_base_url: str | None = None
+    game_project_api_key: str | None = None
     uploaded_text_db_path: str = "uploaded_texts.db"
     uploaded_text_cleanup_max_age_hours: int = 24
     document_answerer_type: str = "rule"
@@ -64,9 +64,9 @@ class Settings:
 def get_settings() -> Settings:
     return Settings(
         extractor_type=os.getenv("EXTRACTOR_TYPE", "rule").lower(),
-        order_client_type=os.getenv("ORDER_CLIENT_TYPE", "local").lower(),
-        order_api_base_url=os.getenv("ORDER_API_BASE_URL"),
-        order_api_key=os.getenv("ORDER_API_KEY"),
+        game_project_client_type=os.getenv("GAME_PROJECT_CLIENT_TYPE", "local").lower(),
+        game_project_api_base_url=os.getenv("GAME_PROJECT_API_BASE_URL"),
+        game_project_api_key=os.getenv("GAME_PROJECT_API_KEY"),
         uploaded_text_db_path=os.getenv(
             "APP_UPLOADED_TEXT_DB_PATH",
             "uploaded_texts.db",

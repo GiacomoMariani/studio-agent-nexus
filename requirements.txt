@@ -3,10 +3,10 @@ uvicorn[standard]
 pydantic
 python-multipart
 sentence-transformers
-pytest
-httpx
 pypdf
 streamlit
 requests
 python-dotenv
 openai
+sqlalchemy
+alembic

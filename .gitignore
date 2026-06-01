@@ -222,3 +222,7 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Agentic workflow — local only, never committed
+tickets/
+AGENTS.md
