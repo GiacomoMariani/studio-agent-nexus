@@ -100,16 +100,16 @@ FOOTER_CONTENT: dict[str, dict] = {
     },
     "board": {
         "badges": [
-            "Agentic Reasoning", "Structured Output",
-            "Multi-step Orchestration", "Tool Integration",
+            "Structured Output", "DB Persistence",
+            "Upsert API", "Role-Based UX",
         ],
         "text": (
-            "The board unifies extraction and planning. The agent produces a "
-            "schema-enforced task list, reconciles each task against live GitHub activity, "
-            "and grades readiness by reasoning over a chosen design document. Holding all "
-            "three contexts at once — tasks, code state, and spec — is what lets the agent "
-            "tell a producer what is genuinely ready to move forward versus what is still "
-            "blocked."
+            "The board displays board items and planning suggestions that an external "
+            "producer POSTs to the backend's reviews API, persisted in SQLite. Items are "
+            "grouped by state and scoped to a source document; a planning suggestion can be "
+            "promoted into a backlog item with one call. A single upsert endpoint both "
+            "creates an item and moves it between states — re-posting the same id overwrites "
+            "— so the producer drives the data while the UI stays a clean, role-aware view."
         ),
     },
     "risks": {

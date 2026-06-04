@@ -1,5 +1,6 @@
-import pytest
 import urllib.error
+
+import pytest
 
 from clients.game_project_client import (
     FallbackGameProjectClient,

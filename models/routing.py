@@ -2,7 +2,6 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-
 RouteName = Literal["extract", "classify", "summarize", "answer"]
 
 

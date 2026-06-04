@@ -4,7 +4,6 @@ import urllib.error
 import urllib.request
 from typing import Any
 
-
 TASK_FIXTURES: dict[str, dict[str, Any]] = {
     "TASK-001": {
         "status": "in_progress",

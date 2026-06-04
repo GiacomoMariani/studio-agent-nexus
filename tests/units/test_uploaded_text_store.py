@@ -1,6 +1,8 @@
-from services.uploaded_text_store import SQLiteUploadedTextStore
 import sqlite3
 from datetime import datetime
+
+from services.uploaded_text_store import SQLiteUploadedTextStore
+
 
 def test_sqlite_uploaded_text_store_saves_and_reads_text(tmp_path):
     store = SQLiteUploadedTextStore(tmp_path / "uploaded_texts.db")

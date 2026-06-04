@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Protocol
+
 from fastapi import BackgroundTasks
 
 from models.ingestion_queue_model import (

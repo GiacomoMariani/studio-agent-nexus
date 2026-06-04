@@ -7,3 +7,8 @@ select = ["E", "F", "I"]
 # Ported verbatim data and CSS — line length is not meaningful here.
 "frontend/fixtures.py" = ["E501"]
 "frontend/styles.py" = ["E501"]
+# load_dotenv() must run before importing modules that read env at import time.
+"main.py" = ["E402"]
+# Verbatim LLM prompt-template text — line length is not meaningful here.
+"services/document_qa_prompt_builder.py" = ["E501"]
+"tests/units/test_document_qa_prompt_builder.py" = ["E501"]

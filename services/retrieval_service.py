@@ -4,7 +4,6 @@ from dataclasses import dataclass
 from providers.embedding_provider import LocalEmbeddingProvider
 from services.document_store import StoredChunk
 
-
 STOPWORDS = {
     "a",
     "an",

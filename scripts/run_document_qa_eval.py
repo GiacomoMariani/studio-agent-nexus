@@ -4,22 +4,20 @@ import logging
 import sys
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parents[1]
 
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 
-from models.evaluation import DocumentQAEvalCase
-from services.document_answering_service import DocumentAnsweringService
-from services.document_ingestion_service import DocumentIngestionService
-from services.document_qa_evaluation_service import DocumentQAEvaluationService
-from services.document_store import InMemoryDocumentStore
-from services.evaluation_result_store import SQLiteEvaluationResultStore
-from services.retrieval_service import RetrievalService
-from services.rule_based_answerer import RuleBasedAnswerer
-
+from models.evaluation import DocumentQAEvalCase  # noqa: E402
+from services.document_answering_service import DocumentAnsweringService  # noqa: E402
+from services.document_ingestion_service import DocumentIngestionService  # noqa: E402
+from services.document_qa_evaluation_service import DocumentQAEvaluationService  # noqa: E402
+from services.document_store import InMemoryDocumentStore  # noqa: E402
+from services.evaluation_result_store import SQLiteEvaluationResultStore  # noqa: E402
+from services.retrieval_service import RetrievalService  # noqa: E402
+from services.rule_based_answerer import RuleBasedAnswerer  # noqa: E402
 
 logger = logging.getLogger(__name__)
 

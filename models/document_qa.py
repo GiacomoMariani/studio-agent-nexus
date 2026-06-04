@@ -87,6 +87,10 @@ class DocumentQueryLogResponse(BaseModel):
     latency_ms: float
     was_fallback: bool
     created_at: str
+    model_name: str = ""
+    input_tokens: int = 0
+    output_tokens: int = 0
+    estimated_cost_usd: float = 0.0
     retrieved_sources: list[DocumentQueryRetrievedSourceLogResponse] = Field(
         default_factory=list
     )

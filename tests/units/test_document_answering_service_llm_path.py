@@ -1,7 +1,7 @@
 import pytest
 
-from services.document_answering_service import DocumentAnsweringService
 from services.document_answerer_factory import get_document_answerer
+from services.document_answering_service import DocumentAnsweringService
 from services.document_store import InMemoryDocumentStore
 from services.retrieval_service import ScoredChunk
 from settings import Settings

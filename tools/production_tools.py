@@ -3,7 +3,6 @@ from typing import Any
 from clients.game_project_client import create_game_project_client
 from settings import get_settings
 
-
 settings = get_settings()
 
 GAME_PROJECT_CLIENT = create_game_project_client(

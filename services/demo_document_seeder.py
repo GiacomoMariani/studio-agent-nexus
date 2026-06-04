@@ -33,6 +33,10 @@ class DemoDocumentSeeder:
             if path.suffix.lower() not in {".txt", ".md", ".pdf"}:
                 continue
 
+            # README files document the demo folder; they are not knowledge-base content.
+            if path.stem.lower() == "readme":
+                continue
+
             text = self._read_text(path)
 
             await self.ingestion_service.ingest_text(

@@ -1,6 +1,5 @@
 from dataclasses import dataclass
 
-
 _DEMO_NOTICE_PATTERNS = (
     "important demo notice",
     "fictional sample data only",

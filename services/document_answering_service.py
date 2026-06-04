@@ -14,7 +14,6 @@ from services.retrieval_service import RetrievalService
 from services.rule_based_answerer import RuleBasedAnswerer
 from services.usage_tracking_service import SQLiteUsageTrackingService
 
-
 FALLBACK_ANSWER = "I could not find this information in the uploaded documents."
 
 

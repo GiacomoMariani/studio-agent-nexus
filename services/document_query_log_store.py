@@ -31,6 +31,10 @@ class StoredDocumentQueryLog:
     was_fallback: bool
     latency_ms: float
     created_at: str
+    model_name: str = ""
+    input_tokens: int = 0
+    output_tokens: int = 0
+    estimated_cost_usd: float = 0.0
     retrieved_sources: list[StoredRetrievedSource] = field(default_factory=list)
 
 
@@ -55,7 +59,11 @@ class SQLiteDocumentQueryLogStore:
                     citation_count INTEGER NOT NULL,
                     was_fallback INTEGER NOT NULL DEFAULT 0,
                     latency_ms REAL NOT NULL,
-                    created_at TEXT NOT NULL
+                    created_at TEXT NOT NULL,
+                    model_name TEXT NOT NULL DEFAULT '',
+                    input_tokens INTEGER NOT NULL DEFAULT 0,
+                    output_tokens INTEGER NOT NULL DEFAULT 0,
+                    estimated_cost_usd REAL NOT NULL DEFAULT 0
                 )
                 """
             )
@@ -92,6 +100,10 @@ class SQLiteDocumentQueryLogStore:
         was_fallback: bool,
         latency_ms: float,
         retrieved_sources: list[Any] | None = None,
+        model_name: str = "",
+        input_tokens: int = 0,
+        output_tokens: int = 0,
+        estimated_cost_usd: float = 0.0,
     ) -> StoredDocumentQueryLog:
         query_log_id = f"query-{uuid4().hex[:12]}"
         created_at = self._now()
@@ -113,9 +125,13 @@ class SQLiteDocumentQueryLogStore:
                     citation_count,
                     was_fallback,
                     latency_ms,
-                    created_at
+                    created_at,
+                    model_name,
+                    input_tokens,
+                    output_tokens,
+                    estimated_cost_usd
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     query_log_id,
@@ -126,6 +142,10 @@ class SQLiteDocumentQueryLogStore:
                     1 if was_fallback else 0,
                     latency_ms,
                     created_at,
+                    model_name,
+                    input_tokens,
+                    output_tokens,
+                    estimated_cost_usd,
                 ),
             )
 
@@ -171,6 +191,10 @@ class SQLiteDocumentQueryLogStore:
             was_fallback=was_fallback,
             latency_ms=latency_ms,
             created_at=created_at,
+            model_name=model_name,
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+            estimated_cost_usd=estimated_cost_usd,
             retrieved_sources=normalized_sources,
         )
 
@@ -188,7 +212,11 @@ class SQLiteDocumentQueryLogStore:
                     citation_count,
                     was_fallback,
                     latency_ms,
-                    created_at
+                    created_at,
+                    model_name,
+                    input_tokens,
+                    output_tokens,
+                    estimated_cost_usd
                 FROM document_query_logs
                 ORDER BY created_at DESC
                 LIMIT ?
@@ -238,7 +266,11 @@ class SQLiteDocumentQueryLogStore:
                        citation_count,
                        was_fallback,
                        latency_ms,
-                       created_at
+                       created_at,
+                       model_name,
+                       input_tokens,
+                       output_tokens,
+                       estimated_cost_usd
                 FROM document_query_logs
                 WHERE was_fallback = 1
                 ORDER BY created_at DESC LIMIT ?
@@ -350,6 +382,10 @@ class SQLiteDocumentQueryLogStore:
             was_fallback=bool(row[5]),
             latency_ms=float(row[6]),
             created_at=str(row[7]),
+            model_name=str(row[8]),
+            input_tokens=int(row[9]),
+            output_tokens=int(row[10]),
+            estimated_cost_usd=float(row[11]),
             retrieved_sources=retrieved_sources,
         )
 
@@ -383,6 +419,18 @@ class SQLiteDocumentQueryLogStore:
                 ADD COLUMN was_fallback INTEGER NOT NULL DEFAULT 0
                 """
             )
+
+        cost_columns = {
+            "model_name": "TEXT NOT NULL DEFAULT ''",
+            "input_tokens": "INTEGER NOT NULL DEFAULT 0",
+            "output_tokens": "INTEGER NOT NULL DEFAULT 0",
+            "estimated_cost_usd": "REAL NOT NULL DEFAULT 0",
+        }
+        for column_name, column_def in cost_columns.items():
+            if column_name not in existing_columns:
+                cursor.execute(
+                    f"ALTER TABLE document_query_logs ADD COLUMN {column_name} {column_def}"
+                )
 
     def _ensure_retrieved_source_columns(self, cursor: sqlite3.Cursor) -> None:
         existing_columns = self._get_columns(

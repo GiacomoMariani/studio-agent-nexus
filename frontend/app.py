@@ -50,8 +50,9 @@ VIEW_BY_ID = {nav_id: view for nav_id, _, _, view in NAV}
 st.session_state.setdefault("page", "ask")        # current nav page
 st.session_state.setdefault("role", "Project Manager")  # role selector
 st.session_state.setdefault("unlocked", False)    # access-key Live-AI toggle (cosmetic)
-st.session_state.setdefault("documents", None)    # real doc list (wired in ticket-003)
-st.session_state.setdefault("last_answer", None)  # last Q&A result (wired in ticket-004)
+st.session_state.setdefault("documents", None)    # real doc list (wired in ticket-004)
+st.session_state.setdefault("last_answer", None)  # last Q&A result (wired in ticket-005)
+st.session_state.setdefault("last_error", None)   # last Q&A error message, if any
 
 
 # ---------------------------------------------------------------------------
@@ -121,10 +122,12 @@ def render_sidebar() -> None:
 
         # Role selector
         st.markdown("<div class='sidebar-label'>Viewing as</div>", unsafe_allow_html=True)
+        roles = ["Project Manager", "Team Member"]
+        current_role = st.session_state["role"] if st.session_state["role"] in roles else roles[0]
         st.session_state["role"] = st.selectbox(
             "role",
-            ["Project Manager", "Team Member", "Observer"],
-            index=["Project Manager", "Team Member", "Observer"].index(st.session_state["role"]),
+            roles,
+            index=roles.index(current_role),
             label_visibility="collapsed",
         )
 

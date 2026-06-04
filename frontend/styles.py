@@ -39,12 +39,12 @@ CUSTOM_CSS = """
     --error:   #EF4444;
     --info:    #3B82F6;
 
-    /* Department */
-    --dept-design:     #6366F1;
-    --dept-art:        #14B8A6;
-    --dept-code:       #3B82F6;
+    /* Department (multiplayer-backend taxonomy) */
+    --dept-backend:    #3B82F6;
+    --dept-infra:      #8B5CF6;
+    --dept-data:       #6366F1;
     --dept-qa:         #F97316;
-    --dept-production: #8B5CF6;
+    --dept-production: #14B8A6;
 
     /* Priority */
     --pri-critical: #EF4444;
@@ -171,9 +171,9 @@ html, body, [class*="css"] { font-family: var(--font); }
     border-radius: 999px; font-size: var(--fs-caption); font-weight: 600; line-height: 1.4;
 }
 .badge--dept { color: #fff; }
-.badge--design     { background: var(--dept-design); color:#fff; }
-.badge--art        { background: var(--dept-art); color:#fff; }
-.badge--code       { background: var(--dept-code); color:#fff; }
+.badge--backend    { background: var(--dept-backend); color:#fff; }
+.badge--infra      { background: var(--dept-infra); color:#fff; }
+.badge--data       { background: var(--dept-data); color:#fff; }
 .badge--qa         { background: var(--dept-qa); color:#fff; }
 .badge--production  { background: var(--dept-production); color:#fff; }
 .badge--critical { background: var(--pri-critical); color:#fff; }

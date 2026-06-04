@@ -8,7 +8,6 @@ from tools.production_tools import (
     get_task_status,
 )
 
-
 TASK_ID_PATTERN = re.compile(r"\bTASK-\d+\b", re.IGNORECASE)
 PENDING_ACTION_PATTERN = re.compile(r"\bPEND-\d+\b", re.IGNORECASE)
 

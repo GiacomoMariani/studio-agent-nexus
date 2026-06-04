@@ -1,7 +1,8 @@
-from contextlib import asynccontextmanager
 import logging
+import os
 import re
 import time
+from contextlib import asynccontextmanager
 from typing import Annotated
 from uuid import uuid4
 
@@ -9,7 +10,6 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from auth import require_api_key
 from fastapi import (
     BackgroundTasks,
     Depends,
@@ -22,6 +22,7 @@ from fastapi import (
 )
 from pydantic import BaseModel, Field
 
+from auth import require_api_key
 from models.answering import AnswerRequest, AnswerResponse
 from models.chat import ChatRequest, ChatResponse
 from models.classification import ClassifyRequest, ClassifyResponse
@@ -48,12 +49,18 @@ from models.health import HealthResponse
 from models.ingestion_queue_model import (
     DocumentReindexIngestionPayload,
     StoredTextUploadIngestionPayload,
-    TextUploadIngestionPayload,
 )
 from models.maintenance import (
     UploadedTextCleanupRequest,
     UploadedTextCleanupResponse,
 )
+from models.planning_suggestion import (
+    SuggestionCreate,
+    SuggestionResponse,
+    suggestion_post_schema,
+)
+from models.review import ReviewCreate, ReviewResponse, review_post_schema
+from models.risk import RiskCreate, RiskResponse, risk_post_schema
 from models.routing import RouteRequest, RouteResponse
 from models.summarization import SummarizeRequest, SummarizeResponse
 from models.tool_assistant import ToolAssistantRequest, ToolAssistantResponse
@@ -63,15 +70,13 @@ from models.usage import (
     UsageRecordResponse,
     UsageSummaryResponse,
 )
-
 from providers.embedding_provider import embedding_provider
-
 from services.answering_service import AnsweringService
 from services.chat_service import ChatService
 from services.classification_service import ClassificationService
 from services.demo_document_seeder import DemoDocumentSeeder
-from services.document_answering_service import DocumentAnsweringService
 from services.document_answerer_factory import get_document_answerer
+from services.document_answering_service import DocumentAnsweringService
 from services.document_ingestion_service import DocumentIngestionService
 from services.document_ingestion_worker import DocumentIngestionWorker
 from services.document_query_log_store import (
@@ -91,7 +96,13 @@ from services.ingestion_queue import (
     FastAPIBackgroundTasksIngestionQueue,
 )
 from services.pdf_parser import extract_pdf_pages
+from services.planning_suggestion_store import (
+    SQLiteSuggestionStore,
+    sqlite_suggestion_store,
+)
 from services.retrieval_service import RetrievalService
+from services.review_store import SQLiteReviewStore, sqlite_review_store
+from services.risk_store import SQLiteRiskStore, sqlite_risk_store
 from services.routing_service import RoutingService
 from services.rule_based_answerer import RuleBasedAnswerer
 from services.rule_based_chatbot import RuleBasedChatbot
@@ -105,14 +116,20 @@ from services.uploaded_text_cleanup_service import delete_stale_uploaded_texts
 from services.uploaded_text_store import SQLiteUploadedTextStore, UploadedTextStore
 from services.usage_tracking_service import (
     SQLiteUsageTrackingService,
+    UsagePricing,
     sqlite_usage_tracking_service,
 )
-
 from settings import get_settings
-
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
+
+# Notional per-1k-token pricing used to cost each query log row. Applied to estimated
+# token counts so the cost dashboard is populated even under the free rule-based answerer.
+QUERY_LOG_PRICING = UsagePricing(
+    input_cost_per_1k_tokens_usd=0.0003,
+    output_cost_per_1k_tokens_usd=0.0012,
+)
 
 
 @asynccontextmanager
@@ -369,6 +386,36 @@ def get_document_query_log_store() -> SQLiteDocumentQueryLogStore:
 DocumentQueryLogStoreDependency = Annotated[
     SQLiteDocumentQueryLogStore,
     Depends(get_document_query_log_store),
+]
+
+
+def get_review_store() -> SQLiteReviewStore:
+    return sqlite_review_store
+
+
+ReviewStoreDependency = Annotated[
+    SQLiteReviewStore,
+    Depends(get_review_store),
+]
+
+
+def get_suggestion_store() -> SQLiteSuggestionStore:
+    return sqlite_suggestion_store
+
+
+SuggestionStoreDependency = Annotated[
+    SQLiteSuggestionStore,
+    Depends(get_suggestion_store),
+]
+
+
+def get_risk_store() -> SQLiteRiskStore:
+    return sqlite_risk_store
+
+
+RiskStoreDependency = Annotated[
+    SQLiteRiskStore,
+    Depends(get_risk_store),
 ]
 
 
@@ -666,6 +713,7 @@ async def ask_document_question(
     request: DocumentAskRequest,
     document_answering_service: DocumentAnsweringServiceDependency,
     document_query_log_store: DocumentQueryLogStoreDependency,
+    usage_tracking_service: UsageTrackingServiceDependency,
 ) -> DocumentAskResponse:
     start_time = time.perf_counter()
 
@@ -689,6 +737,28 @@ async def ask_document_question(
 
     latency_ms = (time.perf_counter() - start_time) * 1000
 
+    # Unified log row: combine the audit fields with model + token + cost figures so the
+    # Logs page reads everything from one table. Token counts are estimated from the
+    # question + retrieved snippets (input) and the answer (output).
+    # Reflect the answerer that actually ran: the factory falls back to rule-based when
+    # OpenAI is configured but no API key is present, so require the key to claim the model.
+    settings = get_settings()
+    if (
+        settings.document_answerer_type == "llm"
+        and settings.document_qa_model_client_type == "openai"
+        and os.getenv("OPENAI_API_KEY")
+    ):
+        model_name = settings.document_qa_model_name
+    else:
+        model_name = "rule-based"
+
+    context_proxy = " ".join(citation.snippet for citation in response.citations)
+    usage = usage_tracking_service.estimate_usage(
+        input_text=f"{request.question} {context_proxy}",
+        output_text=response.answer,
+        pricing=QUERY_LOG_PRICING,
+    )
+
     document_query_log_store.record_query(
         document_id=request.document_id or "all-documents",
         question=request.question,
@@ -697,6 +767,10 @@ async def ask_document_question(
         was_fallback=response.was_fallback,
         latency_ms=latency_ms,
         retrieved_sources=response.citations,
+        model_name=model_name,
+        input_tokens=usage.input_tokens,
+        output_tokens=usage.output_tokens,
+        estimated_cost_usd=usage.estimated_cost_usd,
     )
 
     return response
@@ -869,6 +943,10 @@ async def list_document_query_logs(
                 latency_ms=log.latency_ms,
                 was_fallback=log.was_fallback,
                 created_at=log.created_at,
+                model_name=log.model_name,
+                input_tokens=log.input_tokens,
+                output_tokens=log.output_tokens,
+                estimated_cost_usd=log.estimated_cost_usd,
                 retrieved_sources=[
                     DocumentQueryRetrievedSourceLogResponse(
                         source_id=source.source_id,
@@ -887,6 +965,17 @@ async def list_document_query_logs(
             for log in logs
         ]
     )
+
+
+@app.post(
+    "/admin/document-query-logs/clear",
+    dependencies=[Depends(require_api_key)],
+)
+async def clear_document_query_logs(
+    document_query_log_store: DocumentQueryLogStoreDependency,
+) -> dict:
+    document_query_log_store.clear()
+    return {"cleared": True}
 
 
 @app.get(
@@ -914,3 +1003,210 @@ async def list_knowledge_gaps(
             for log in fallback_logs
         ]
     )
+
+
+@app.post(
+    "/reviews",
+    response_model=ReviewResponse,
+    dependencies=[Depends(require_api_key)],
+)
+async def upsert_review(
+    request: ReviewCreate,
+    review_store: ReviewStoreDependency,
+) -> ReviewResponse:
+    # Upsert: posting an existing task_id overwrites the stored record.
+    record = review_store.upsert(
+        task_id=request.task_id,
+        title=request.title,
+        description=request.description,
+        department=request.department,
+        priority=request.priority,
+        source=request.source,
+        state=request.state,
+    )
+
+    return ReviewResponse(**record)
+
+
+@app.get(
+    "/reviews",
+    response_model=list[ReviewResponse],
+    dependencies=[Depends(require_api_key)],
+)
+async def list_reviews(
+    review_store: ReviewStoreDependency,
+) -> list[ReviewResponse]:
+    return [ReviewResponse(**record) for record in review_store.list()]
+
+
+@app.get(
+    "/reviews/schema",
+    dependencies=[Depends(require_api_key)],
+)
+async def get_reviews_schema() -> dict:
+    return review_post_schema()
+
+
+@app.delete(
+    "/reviews/{task_id}",
+    dependencies=[Depends(require_api_key)],
+)
+async def delete_review(
+    task_id: str,
+    review_store: ReviewStoreDependency,
+) -> dict:
+    deleted = review_store.delete(task_id)
+
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Review not found.")
+
+    return {"task_id": task_id, "deleted": True}
+
+
+@app.post(
+    "/planning-suggestions",
+    response_model=SuggestionResponse,
+    dependencies=[Depends(require_api_key)],
+)
+async def upsert_suggestion(
+    request: SuggestionCreate,
+    suggestion_store: SuggestionStoreDependency,
+) -> SuggestionResponse:
+    # Upsert: posting an existing suggestion_id overwrites the stored record.
+    record = suggestion_store.upsert(
+        suggestion_id=request.suggestion_id,
+        title=request.title,
+        reason=request.reason,
+        department=request.department,
+        priority=request.priority,
+        source=request.source,
+    )
+
+    return SuggestionResponse(**record)
+
+
+@app.get(
+    "/planning-suggestions",
+    response_model=list[SuggestionResponse],
+    dependencies=[Depends(require_api_key)],
+)
+async def list_suggestions(
+    suggestion_store: SuggestionStoreDependency,
+) -> list[SuggestionResponse]:
+    return [SuggestionResponse(**record) for record in suggestion_store.list()]
+
+
+@app.get(
+    "/planning-suggestions/schema",
+    dependencies=[Depends(require_api_key)],
+)
+async def get_suggestions_schema() -> dict:
+    return suggestion_post_schema()
+
+
+@app.delete(
+    "/planning-suggestions/{suggestion_id}",
+    dependencies=[Depends(require_api_key)],
+)
+async def delete_suggestion(
+    suggestion_id: str,
+    suggestion_store: SuggestionStoreDependency,
+) -> dict:
+    deleted = suggestion_store.delete(suggestion_id)
+
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Planning suggestion not found.")
+
+    return {"suggestion_id": suggestion_id, "deleted": True}
+
+
+@app.post(
+    "/planning-suggestions/{suggestion_id}/promote",
+    response_model=ReviewResponse,
+    dependencies=[Depends(require_api_key)],
+)
+async def promote_suggestion(
+    suggestion_id: str,
+    suggestion_store: SuggestionStoreDependency,
+    review_store: ReviewStoreDependency,
+) -> ReviewResponse:
+    suggestion = suggestion_store.get(suggestion_id)
+
+    if suggestion is None:
+        raise HTTPException(status_code=404, detail="Planning suggestion not found.")
+
+    # Promote into a backlog review; task_id = suggestion_id keeps the link traceable.
+    review = review_store.upsert(
+        task_id=suggestion_id,
+        title=suggestion["title"],
+        description=suggestion["reason"],
+        department=suggestion["department"],
+        priority=suggestion["priority"],
+        source=suggestion["source"],
+        state="backlog",
+    )
+
+    suggestion_store.delete(suggestion_id)
+
+    return ReviewResponse(**review)
+
+
+@app.post(
+    "/risks",
+    response_model=RiskResponse,
+    dependencies=[Depends(require_api_key)],
+)
+async def upsert_risk(
+    request: RiskCreate,
+    risk_store: RiskStoreDependency,
+) -> RiskResponse:
+    # Upsert: posting an existing risk_id overwrites the stored finding.
+    record = risk_store.upsert(
+        risk_id=request.risk_id,
+        kind=request.kind,
+        severity=request.severity,
+        title=request.title,
+        description=request.description,
+        source=request.source,
+        a_file=request.a_file,
+        a_text=request.a_text,
+        b_file=request.b_file,
+        b_text=request.b_text,
+    )
+
+    return RiskResponse(**record)
+
+
+@app.get(
+    "/risks",
+    response_model=list[RiskResponse],
+    dependencies=[Depends(require_api_key)],
+)
+async def list_risks(
+    risk_store: RiskStoreDependency,
+) -> list[RiskResponse]:
+    return [RiskResponse(**record) for record in risk_store.list()]
+
+
+@app.get(
+    "/risks/schema",
+    dependencies=[Depends(require_api_key)],
+)
+async def get_risks_schema() -> dict:
+    return risk_post_schema()
+
+
+@app.delete(
+    "/risks/{risk_id}",
+    dependencies=[Depends(require_api_key)],
+)
+async def delete_risk(
+    risk_id: str,
+    risk_store: RiskStoreDependency,
+) -> dict:
+    deleted = risk_store.delete(risk_id)
+
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Risk not found.")
+
+    return {"risk_id": risk_id, "deleted": True}

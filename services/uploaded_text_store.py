@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import sqlite3
 import uuid
+from datetime import datetime
 from pathlib import Path
 from typing import Protocol
-from datetime import datetime
+
 
 class UploadedTextStore(Protocol):
     def save_text(self, filename: str, text: str) -> str:

@@ -2,7 +2,6 @@ import os
 
 from fastapi import Header, HTTPException
 
-
 API_KEY_ENV_NAME = "APP_API_KEY"
 
 

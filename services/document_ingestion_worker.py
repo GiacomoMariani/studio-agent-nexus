@@ -4,7 +4,6 @@ from services.document_ingestion_service import DocumentIngestionService
 from services.exceptions import AppServiceError
 from services.ingestion_job_store import IngestionJob, SQLiteIngestionJobStore
 
-
 logger = logging.getLogger(__name__)
 
 

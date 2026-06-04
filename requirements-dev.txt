@@ -2,3 +2,5 @@ pytest
 pytest-asyncio
 httpx
 ruff
+# Content tool: regenerate the demo PDFs (scripts/generate_demo_pdfs.py). Not a runtime dep.
+reportlab

@@ -207,7 +207,9 @@ class DocumentQAEvaluationService:
             return
 
         if not citations:
-            failures.append("Retrieval scores could not be checked because no citations were returned.")
+            failures.append(
+                "Retrieval scores could not be checked because no citations were returned."
+            )
             return
 
         for citation in citations:

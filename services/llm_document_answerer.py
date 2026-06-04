@@ -5,7 +5,6 @@ from services.document_qa_prompt_builder import (
     build_document_qa_prompt,
 )
 
-
 FALLBACK_ANSWER = (
     "I could not find this information in the uploaded documents."
 )
