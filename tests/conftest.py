@@ -72,6 +72,13 @@ def set_test_api_key(monkeypatch):
 
 @pytest.fixture(autouse=True)
 def force_local_answerer(monkeypatch):
-    # Keep the suite deterministic and free: never hit a real OpenAI key from the dev .env.
+    # Keep the suite deterministic and free: never hit a real provider key from the dev .env.
     monkeypatch.setenv("DOCUMENT_ANSWERER_TYPE", "rule")
     monkeypatch.setenv("DOCUMENT_QA_MODEL_CLIENT_TYPE", "fake")
+    monkeypatch.setenv("CLASSIFIER_TYPE", "rule")
+    monkeypatch.setenv("SUMMARIZER_TYPE", "rule")
+    monkeypatch.setenv("ANSWERER_TYPE", "rule")
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    monkeypatch.delenv("GOOGLE_API_KEY", raising=False)
+    monkeypatch.delenv("GROQ_API_KEY", raising=False)

@@ -1,7 +1,7 @@
 """Board page — displays persisted reviews + planning suggestions from the DB.
 
-Data is posted to the backend by an external producer (see the how-to-post manual in
-`tickets/`); this page is a read-only, role-aware view. No GitHub anywhere.
+Data is posted to the backend by an external producer; this page is a read-only,
+role-aware view. No GitHub anywhere.
 """
 
 from html import escape

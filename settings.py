@@ -55,10 +55,13 @@ class Settings:
     game_project_api_key: str | None = None
     uploaded_text_db_path: str = "uploaded_texts.db"
     uploaded_text_cleanup_max_age_hours: int = 24
-    document_answerer_type: str = "rule"
-    document_qa_model_client_type: str = "fake"
-    document_qa_model_name: str = "fake-document-qa"
+    document_answerer_type: str = "llm"
+    document_qa_model_client_type: str = "gemini"
+    document_qa_model_name: str = "gemini-2.5-flash"
     document_qa_fallback_to_rule: bool = True
+    classifier_type: str = "llm"
+    summarizer_type: str = "llm"
+    answerer_type: str = "llm"
 
 
 def get_settings() -> Settings:
@@ -79,18 +82,21 @@ def get_settings() -> Settings:
         ),
         document_answerer_type=os.getenv(
             "DOCUMENT_ANSWERER_TYPE",
-            "rule",
+            "llm",
         ).lower(),
         document_qa_model_client_type=os.getenv(
             "DOCUMENT_QA_MODEL_CLIENT_TYPE",
-            "fake",
+            "gemini",
         ).lower(),
         document_qa_model_name=os.getenv(
             "DOCUMENT_QA_MODEL_NAME",
-            "fake-document-qa",
+            "gemini-2.5-flash",
         ),
         document_qa_fallback_to_rule=_get_bool_env(
             "DOCUMENT_QA_FALLBACK_TO_RULE",
             default=True,
         ),
+        classifier_type=os.getenv("CLASSIFIER_TYPE", "llm").lower(),
+        summarizer_type=os.getenv("SUMMARIZER_TYPE", "llm").lower(),
+        answerer_type=os.getenv("ANSWERER_TYPE", "llm").lower(),
     )

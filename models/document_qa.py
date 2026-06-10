@@ -57,6 +57,7 @@ class DocumentAskResponse(BaseModel):
     answer: str
     citations: list[Citation]
     was_fallback: bool = False
+    provider: str = "local"
 
 
 class DocumentReindexResponse(BaseModel):

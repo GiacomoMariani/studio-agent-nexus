@@ -1,5 +1,4 @@
 import logging
-import os
 import re
 import time
 from contextlib import asynccontextmanager
@@ -71,9 +70,11 @@ from models.usage import (
     UsageSummaryResponse,
 )
 from providers.embedding_provider import embedding_provider
+from services.answerer_factory import get_answerer
 from services.answering_service import AnsweringService
 from services.chat_service import ChatService
 from services.classification_service import ClassificationService
+from services.classifier_factory import get_classifier
 from services.demo_document_seeder import DemoDocumentSeeder
 from services.document_answerer_factory import get_document_answerer
 from services.document_answering_service import DocumentAnsweringService
@@ -104,13 +105,11 @@ from services.retrieval_service import RetrievalService
 from services.review_store import SQLiteReviewStore, sqlite_review_store
 from services.risk_store import SQLiteRiskStore, sqlite_risk_store
 from services.routing_service import RoutingService
-from services.rule_based_answerer import RuleBasedAnswerer
 from services.rule_based_chatbot import RuleBasedChatbot
-from services.rule_based_classifier import RuleBasedClassifier
 from services.rule_based_router import RuleBasedRouter
-from services.rule_based_summarizer import RuleBasedSummarizer
 from services.sqlite_document_store import sqlite_document_store
 from services.summarization_service import SummarizationService
+from services.summarizer_factory import get_summarizer
 from services.tool_assistant_service import ToolAssistantService
 from services.uploaded_text_cleanup_service import delete_stale_uploaded_texts
 from services.uploaded_text_store import SQLiteUploadedTextStore, UploadedTextStore
@@ -232,8 +231,7 @@ ExtractionServiceDependency = Annotated[
 
 
 def get_classification_service() -> ClassificationService:
-    classifier = RuleBasedClassifier()
-    return ClassificationService(classifier)
+    return ClassificationService(get_classifier(get_settings()))
 
 
 ClassificationServiceDependency = Annotated[
@@ -243,8 +241,7 @@ ClassificationServiceDependency = Annotated[
 
 
 def get_summarization_service() -> SummarizationService:
-    summarizer = RuleBasedSummarizer()
-    return SummarizationService(summarizer)
+    return SummarizationService(get_summarizer(get_settings()))
 
 
 SummarizationServiceDependency = Annotated[
@@ -254,8 +251,7 @@ SummarizationServiceDependency = Annotated[
 
 
 def get_answering_service() -> AnsweringService:
-    answerer = RuleBasedAnswerer()
-    return AnsweringService(answerer)
+    return AnsweringService(get_answerer(get_settings()))
 
 
 AnsweringServiceDependency = Annotated[
@@ -321,11 +317,18 @@ DocumentIngestionWorkerDependency = Annotated[
 def get_document_answering_service() -> DocumentAnsweringService:
     settings = get_settings()
 
+    provider = (
+        settings.document_qa_model_client_type
+        if settings.document_answerer_type == "llm"
+        else "local"
+    )
+
     return DocumentAnsweringService(
         store=sqlite_document_store,
         retrieval_service=RetrievalService(embedding_provider),
         answerer=get_document_answerer(settings),
         usage_tracking_service=sqlite_usage_tracking_service,
+        provider=provider,
     )
 
 
@@ -740,14 +743,10 @@ async def ask_document_question(
     # Unified log row: combine the audit fields with model + token + cost figures so the
     # Logs page reads everything from one table. Token counts are estimated from the
     # question + retrieved snippets (input) and the answer (output).
-    # Reflect the answerer that actually ran: the factory falls back to rule-based when
-    # OpenAI is configured but no API key is present, so require the key to claim the model.
+    # Reflect the configured answerer in the log: the live model when the LLM answerer
+    # is selected, otherwise the rule-based path. Provider-agnostic by design.
     settings = get_settings()
-    if (
-        settings.document_answerer_type == "llm"
-        and settings.document_qa_model_client_type == "openai"
-        and os.getenv("OPENAI_API_KEY")
-    ):
+    if settings.document_answerer_type == "llm":
         model_name = settings.document_qa_model_name
     else:
         model_name = "rule-based"

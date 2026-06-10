@@ -40,9 +40,16 @@ def _summary(logs: list[dict]) -> dict:
 
 
 def _mode_badge(model_name: str) -> str:
-    if model_name and model_name != "rule-based":
-        return badge_html(f"OpenAI · {model_name}", "badge--mode-openai")
-    return badge_html("Local · rule-based", "badge--mode-local")
+    name = model_name or ""
+    if not name or name == "rule-based":
+        return badge_html("Local · rule-based", "badge--mode-local")
+    if name.startswith("gemini"):
+        return badge_html(f"Gemini · {name}", "badge--mode-gemini")
+    if name.startswith("gpt"):
+        return badge_html(f"OpenAI · {name}", "badge--mode-openai")
+    if name.startswith("llama") or name.startswith("groq"):
+        return badge_html(f"Groq · {name}", "badge--mode-groq")
+    return badge_html(f"LLM · {name}", "badge--mode-openai")
 
 
 def _ts(created_at: str) -> str:

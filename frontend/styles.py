@@ -1,6 +1,6 @@
 """Design-system CSS for Studio Agent Nexus.
 
-Ported from the Claude Design prototype: dark-navy shell, amber accent, white content
+Ported from the design prototype: dark-navy shell, amber accent, white content
 panels, Inter typography. Aggressive Streamlit overrides are used deliberately to match
 the prototype (approved design-fidelity trade-off).
 """
@@ -183,6 +183,8 @@ html, body, [class*="css"] { font-family: var(--font); }
 .badge--type-md  { background: rgba(59,130,246,.15); color: var(--info); }
 .badge--type-pdf { background: rgba(139,92,246,.15); color: var(--dept-production); }
 .badge--mode-openai { background: rgba(59,130,246,.15); color: var(--info); }
+.badge--mode-gemini { background: rgba(138,180,248,.18); color:#8ab4f8; }
+.badge--mode-groq   { background: rgba(240,101,67,.18); color:#f06543; }
 .badge--mode-local  { background: var(--bg-3); color: var(--text-muted-on-dark); }
 .badge--status-indexed    { background: rgba(34,197,94,.15); color: var(--success); }
 .badge--status-processing { background: rgba(245,158,11,.15); color: var(--accent); }

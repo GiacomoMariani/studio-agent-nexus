@@ -44,12 +44,16 @@ def _group_citations(citations: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return result
 
 
+def _score_label(best: float) -> str:
+    # Relative match within this result set (min-max normalised), not an absolute score.
+    return f"Relative match: {best * 100:.0f}%"
+
+
 def _run_query(question: str) -> None:
     cleaned = question.strip()
     if not cleaned:
         st.warning("Enter a question before asking.")
         return
-    mode = "openai" if st.session_state.get("unlocked") else "local"
     try:
         with st.spinner("Retrieving sources and generating an answer…"):
             response = api.ask_documents(cleaned, top_k=TOP_K)
@@ -63,17 +67,27 @@ def _run_query(question: str) -> None:
         "answer": response.get("answer", ""),
         "was_fallback": bool(response.get("was_fallback")),
         "citations": response.get("citations", []),
-        "mode": mode,
+        "provider": response.get("provider", "local"),
     }
 
 
-def _render_answer(item: dict[str, Any]) -> None:
-    mode = item.get("mode", "local")
-    mode_badge = (
-        badge_html("OpenAI · gpt-4.1-mini", "badge--mode-openai")
-        if mode == "openai"
-        else badge_html("Local · Rule-based", "badge--mode-local")
+_PROVIDER_BADGES = {
+    "gemini": ("Gemini", "badge--mode-gemini"),
+    "groq": ("Groq", "badge--mode-groq"),
+    "openai": ("OpenAI", "badge--mode-openai"),
+}
+
+
+def _provider_badge(provider: str) -> str:
+    label, css_class = _PROVIDER_BADGES.get(
+        provider,
+        ("Local · Rule-based", "badge--mode-local"),
     )
+    return badge_html(label, css_class)
+
+
+def _render_answer(item: dict[str, Any]) -> None:
+    mode_badge = _provider_badge(item.get("provider", "local"))
 
     with st.container(border=True):
         st.markdown(
@@ -114,7 +128,7 @@ def _render_answer(item: dict[str, Any]) -> None:
                         unsafe_allow_html=True,
                     )
                 if isinstance(group.get("best"), (int, float)):
-                    st.caption(f"Retrieval score: {group['best']:.2f}")
+                    st.caption(_score_label(group["best"]))
 
 
 def render() -> None:

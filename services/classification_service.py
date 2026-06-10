@@ -1,14 +1,14 @@
 import logging
 
 from models.classification import ClassifyResponse
+from services.classifier import Classifier
 from services.exceptions import AppServiceError
-from services.rule_based_classifier import RuleBasedClassifier
 
 logger = logging.getLogger(__name__)
 
 
 class ClassificationService:
-    def __init__(self, classifier: RuleBasedClassifier):
+    def __init__(self, classifier: Classifier):
         self.classifier = classifier
 
     async def classify(self, text: str) -> ClassifyResponse:

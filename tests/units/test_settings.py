@@ -24,12 +24,12 @@ def test_get_settings_rejects_invalid_uploaded_text_cleanup_age(
         get_settings()
 
 
-def test_get_settings_uses_rule_document_answerer_by_default(monkeypatch):
+def test_get_settings_uses_llm_document_answerer_by_default(monkeypatch):
     monkeypatch.delenv("DOCUMENT_ANSWERER_TYPE", raising=False)
 
     settings = get_settings()
 
-    assert settings.document_answerer_type == "rule"
+    assert settings.document_answerer_type == "llm"
 
 
 def test_get_settings_reads_document_answerer_type(monkeypatch):
@@ -39,14 +39,14 @@ def test_get_settings_reads_document_answerer_type(monkeypatch):
 
     assert settings.document_answerer_type == "llm"
 
-def test_get_settings_uses_fake_document_qa_model_client_by_default(monkeypatch):
+def test_get_settings_uses_gemini_document_qa_model_client_by_default(monkeypatch):
     monkeypatch.delenv("DOCUMENT_QA_MODEL_CLIENT_TYPE", raising=False)
     monkeypatch.delenv("DOCUMENT_QA_MODEL_NAME", raising=False)
 
     settings = get_settings()
 
-    assert settings.document_qa_model_client_type == "fake"
-    assert settings.document_qa_model_name == "fake-document-qa"
+    assert settings.document_qa_model_client_type == "gemini"
+    assert settings.document_qa_model_name == "gemini-2.5-flash"
 
 
 def test_get_settings_reads_document_qa_model_client_config(monkeypatch):
@@ -83,3 +83,51 @@ def test_get_settings_rejects_invalid_document_qa_rule_fallback(monkeypatch):
         assert "DOCUMENT_QA_FALLBACK_TO_RULE" in str(ex)
     else:
         raise AssertionError("Expected ValueError.")
+
+
+def test_get_settings_uses_llm_classifier_by_default(monkeypatch):
+    monkeypatch.delenv("CLASSIFIER_TYPE", raising=False)
+
+    settings = get_settings()
+
+    assert settings.classifier_type == "llm"
+
+
+def test_get_settings_reads_classifier_type(monkeypatch):
+    monkeypatch.setenv("CLASSIFIER_TYPE", "RULE")
+
+    settings = get_settings()
+
+    assert settings.classifier_type == "rule"
+
+
+def test_get_settings_uses_llm_summarizer_by_default(monkeypatch):
+    monkeypatch.delenv("SUMMARIZER_TYPE", raising=False)
+
+    settings = get_settings()
+
+    assert settings.summarizer_type == "llm"
+
+
+def test_get_settings_reads_summarizer_type(monkeypatch):
+    monkeypatch.setenv("SUMMARIZER_TYPE", "RULE")
+
+    settings = get_settings()
+
+    assert settings.summarizer_type == "rule"
+
+
+def test_get_settings_uses_llm_answerer_by_default(monkeypatch):
+    monkeypatch.delenv("ANSWERER_TYPE", raising=False)
+
+    settings = get_settings()
+
+    assert settings.answerer_type == "llm"
+
+
+def test_get_settings_reads_answerer_type(monkeypatch):
+    monkeypatch.setenv("ANSWERER_TYPE", "RULE")
+
+    settings = get_settings()
+
+    assert settings.answerer_type == "rule"

@@ -8,5 +8,7 @@ streamlit
 requests
 python-dotenv
 openai
+google-genai
+groq
 sqlalchemy
 alembic

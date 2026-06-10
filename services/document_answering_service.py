@@ -12,6 +12,7 @@ from services.document_store import StoredDocument
 from services.exceptions import NotFoundError
 from services.retrieval_service import RetrievalService
 from services.rule_based_answerer import RuleBasedAnswerer
+from services.text_cleaning import make_snippet
 from services.usage_tracking_service import SQLiteUsageTrackingService
 
 FALLBACK_ANSWER = "I could not find this information in the uploaded documents."
@@ -32,6 +33,7 @@ class DocumentAnsweringService:
         retrieval_service: RetrievalService,
         answerer: DocumentAnswerer | RuleBasedAnswerer,
         usage_tracking_service: SQLiteUsageTrackingService | None = None,
+        provider: str = "local",
     ):
         self.store = store
         self.retrieval_service = retrieval_service
@@ -41,6 +43,7 @@ class DocumentAnsweringService:
             else answerer
         )
         self.usage_tracking_service = usage_tracking_service
+        self.provider = provider
 
     async def answer(
         self,
@@ -120,7 +123,7 @@ class DocumentAnsweringService:
         if self.usage_tracking_service is not None:
             self.usage_tracking_service.record_usage(
                 operation="document_answer",
-                provider="local",
+                provider=self.provider,
                 model_name=getattr(
                     self.answerer,
                     "model_name",
@@ -137,6 +140,7 @@ class DocumentAnsweringService:
             answer=answer_response.answer,
             citations=visible_citations,
             was_fallback=answer_response.was_fallback,
+            provider=self.provider,
         )
 
     async def answer_all(
@@ -240,7 +244,7 @@ class DocumentAnsweringService:
         if self.usage_tracking_service is not None:
             self.usage_tracking_service.record_usage(
                 operation="knowledge_base_answer",
-                provider="local",
+                provider=self.provider,
                 model_name=getattr(
                     self.answerer,
                     "model_name",
@@ -257,15 +261,11 @@ class DocumentAnsweringService:
             answer=answer_response.answer,
             citations=visible_citations,
             was_fallback=answer_response.was_fallback,
+            provider=self.provider,
         )
 
     def _snippet(self, text: str, limit: int = 160) -> str:
-        cleaned = " ".join(text.split())
-
-        if len(cleaned) <= limit:
-            return cleaned
-
-        return cleaned[:limit].rstrip() + "..."
+        return make_snippet(text, limit=limit)
 
 
 def _polish_answer_response(

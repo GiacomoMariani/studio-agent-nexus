@@ -5,9 +5,8 @@ design-system CSS, and dispatch to the per-page views in ``frontend/views/``.
 
 Manual smoke test:
     streamlit run frontend/app.py
-  - Sidebar shows wordmark, 5 nav items, access-key field, role selector, credit.
+  - Sidebar shows wordmark, 5 nav items, provider indicator, role selector, credit.
   - Clicking a nav item switches the page and highlights it (amber).
-  - Entering any access key flips the "Live AI" state and shows a toast.
   - Each page shows its header, a placeholder, and the "What this page demonstrates" footer.
 """
 
@@ -19,7 +18,6 @@ import streamlit as st
 # Ensure local modules (components, styles, views) are importable when run via Streamlit.
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from components import toast  # noqa: E402
 from styles import CUSTOM_CSS  # noqa: E402
 from views import ask, board, logs, risks, upload  # noqa: E402
 
@@ -49,9 +47,8 @@ VIEW_BY_ID = {nav_id: view for nav_id, _, _, view in NAV}
 # ---------------------------------------------------------------------------
 st.session_state.setdefault("page", "ask")        # current nav page
 st.session_state.setdefault("role", "Project Manager")  # role selector
-st.session_state.setdefault("unlocked", False)    # access-key Live-AI toggle (cosmetic)
-st.session_state.setdefault("documents", None)    # real doc list (wired in ticket-004)
-st.session_state.setdefault("last_answer", None)  # last Q&A result (wired in ticket-005)
+st.session_state.setdefault("documents", None)    # real doc list
+st.session_state.setdefault("last_answer", None)  # last Q&A result
 st.session_state.setdefault("last_error", None)   # last Q&A error message, if any
 
 
@@ -93,30 +90,13 @@ def render_sidebar() -> None:
 
         st.markdown("<div class='sidebar-divider'></div>", unsafe_allow_html=True)
 
-        # Access key — cosmetic Live-AI toggle (see postponed.md item 3)
-        st.markdown("<div class='sidebar-label'>Jira access key</div>", unsafe_allow_html=True)
-        if st.session_state["unlocked"]:
-            st.markdown(
-                "<div style='color:var(--success);font-size:var(--fs-small);font-weight:600;"
-                "margin-bottom:var(--sp-2)'>● Live AI enabled</div>",
-                unsafe_allow_html=True,
-            )
-            if st.button("Lock", key="access_lock", use_container_width=True):
-                st.session_state["unlocked"] = False
-                toast("Live AI locked — answers now run locally", icon="🔒")
-                st.rerun()
-        else:
-            key_value = st.text_input(
-                "access-key",
-                type="password",
-                placeholder="Enter access key",
-                label_visibility="collapsed",
-            )
-            if st.button("Unlock", key="access_unlock", use_container_width=True):
-                if key_value.strip():
-                    st.session_state["unlocked"] = True
-                    toast("Live AI enabled — answers now use gpt-4.1-mini", icon="🔓")
-                    st.rerun()
+        # Live provider indicator — answers run via Gemini.
+        st.markdown("<div class='sidebar-label'>AI engine</div>", unsafe_allow_html=True)
+        st.markdown(
+            "<div style='color:var(--success);font-size:var(--fs-small);font-weight:600;"
+            "margin-bottom:var(--sp-2)'>● Powered by Gemini</div>",
+            unsafe_allow_html=True,
+        )
 
         st.markdown("<div class='sidebar-divider'></div>", unsafe_allow_html=True)
 

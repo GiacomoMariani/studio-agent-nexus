@@ -52,7 +52,10 @@ async def test_document_answering_service_uses_llm_document_answerer():
         store=store,
         retrieval_service=StubRetrievalService(),
         answerer=get_document_answerer(
-            Settings(document_answerer_type="llm")
+            Settings(
+                document_answerer_type="llm",
+                document_qa_model_client_type="fake",
+            )
         ),
         usage_tracking_service=usage_tracking_service,
     )

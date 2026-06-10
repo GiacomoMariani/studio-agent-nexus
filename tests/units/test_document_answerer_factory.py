@@ -19,7 +19,10 @@ def test_get_document_answerer_returns_rule_based_answerer_by_default():
 
 def test_get_document_answerer_returns_llm_answerer_with_rule_fallback_by_default():
     answerer = get_document_answerer(
-        Settings(document_answerer_type="llm")
+        Settings(
+            document_answerer_type="llm",
+            document_qa_model_client_type="fake",
+        )
     )
 
     assert isinstance(answerer, FallbackDocumentAnswerer)
@@ -30,6 +33,7 @@ def test_get_document_answerer_returns_llm_answerer_without_rule_fallback():
     answerer = get_document_answerer(
         Settings(
             document_answerer_type="llm",
+            document_qa_model_client_type="fake",
             document_qa_fallback_to_rule=False,
         )
     )
@@ -48,6 +52,24 @@ def test_get_document_answerer_falls_back_to_rule_when_openai_key_missing_and_fa
             document_answerer_type="llm",
             document_qa_model_client_type="openai",
             document_qa_model_name="gpt-4.1-mini",
+            document_qa_fallback_to_rule=True,
+        )
+    )
+
+    assert isinstance(answerer, RuleBasedDocumentAnswerer)
+
+
+def test_get_document_answerer_falls_back_to_rule_when_gemini_key_missing_and_fallback_enabled(
+    monkeypatch,
+):
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    monkeypatch.delenv("GOOGLE_API_KEY", raising=False)
+
+    answerer = get_document_answerer(
+        Settings(
+            document_answerer_type="llm",
+            document_qa_model_client_type="gemini",
+            document_qa_model_name="gemini-2.5-flash",
             document_qa_fallback_to_rule=True,
         )
     )

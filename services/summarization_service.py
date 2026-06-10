@@ -2,13 +2,13 @@ import logging
 
 from models.summarization import SummarizeResponse
 from services.exceptions import AppServiceError
-from services.rule_based_summarizer import RuleBasedSummarizer
+from services.summarizer import Summarizer
 
 logger = logging.getLogger(__name__)
 
 
 class SummarizationService:
-    def __init__(self, summarizer: RuleBasedSummarizer):
+    def __init__(self, summarizer: Summarizer):
         self.summarizer = summarizer
 
     async def summarize(self, text: str, max_sentences: int) -> SummarizeResponse:

@@ -1,14 +1,14 @@
 import logging
 
 from models.answering import AnswerResponse
+from services.answerer import Answerer
 from services.exceptions import AppServiceError
-from services.rule_based_answerer import RuleBasedAnswerer
 
 logger = logging.getLogger(__name__)
 
 
 class AnsweringService:
-    def __init__(self, answerer: RuleBasedAnswerer):
+    def __init__(self, answerer: Answerer):
         self.answerer = answerer
 
     async def answer(self, question: str, context: str) -> AnswerResponse:

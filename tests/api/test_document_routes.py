@@ -444,6 +444,7 @@ def test_ask_documents_without_document_id_searches_all_documents():
 
     assert "FastAPI" in payload["answer"]
     assert payload["was_fallback"] is False
+    assert payload["provider"] == "local"
     assert len(payload["citations"]) >= 1
     assert payload["citations"][0]["filename"] == "backend-guide.txt"
 

@@ -32,8 +32,10 @@ def test_summary_empty():
     assert s == {"stored": 0, "total_cost": 0.0, "avg_cost": 0.0, "tokens": 0, "fallback_rate": 0}
 
 
-def test_mode_badge_local_vs_openai():
+def test_mode_badge_maps_provider_by_model():
     assert "Local" in logs._mode_badge("rule-based")
+    assert "Gemini" in logs._mode_badge("gemini-2.5-flash")
+    assert "Groq" in logs._mode_badge("llama-3.1-8b-instant")
     assert "gpt-4.1-mini" in logs._mode_badge("gpt-4.1-mini")
 
 

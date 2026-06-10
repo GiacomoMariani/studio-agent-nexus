@@ -39,3 +39,16 @@ def test_group_citations_dedupes_identical_snippets():
 
 def test_group_citations_handles_empty():
     assert ask._group_citations([]) == []
+
+
+def test_score_label_formats_as_relative_percentage():
+    assert ask._score_label(1.0) == "Relative match: 100%"
+    assert ask._score_label(0.5) == "Relative match: 50%"
+    assert ask._score_label(0.0) == "Relative match: 0%"
+
+
+def test_provider_badge_reflects_configured_provider():
+    assert "Gemini" in ask._provider_badge("gemini")
+    assert "Groq" in ask._provider_badge("groq")
+    assert "OpenAI" in ask._provider_badge("openai")
+    assert "Rule-based" in ask._provider_badge("local")
