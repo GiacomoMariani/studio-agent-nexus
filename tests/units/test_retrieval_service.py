@@ -1,5 +1,8 @@
+import pytest
+
 from providers.embedding_provider import LocalEmbeddingProvider
-from services.document_store import StoredChunk
+from services.document_ingestion_service import DocumentIngestionService
+from services.document_store import InMemoryDocumentStore, StoredChunk
 from services.retrieval_service import RetrievalService
 
 
@@ -168,3 +171,38 @@ def test_retrieval_rejects_zero_total_weight():
         assert str(exc) == "At least one retrieval weight must be greater than 0."
     else:
         raise AssertionError("Expected ValueError.")
+
+
+@pytest.mark.asyncio
+async def test_section_that_lists_outranks_passing_mention():
+    # Regression for the "Which data stores…" retrieval miss: a dedicated section that
+    # lists the answer must out-rank an intro that merely mentions the keywords.
+    store = InMemoryDocumentStore()
+    embedding_provider = LocalEmbeddingProvider()
+    ingestion_service = DocumentIngestionService(
+        store=store,
+        embedding_provider=embedding_provider,
+    )
+    retrieval_service = RetrievalService(embedding_provider)
+
+    text = (
+        "# Backend Overview\n"
+        "## 1. Purpose\n"
+        "This document describes the servers and the data stores behind them.\n"
+        "## 8. Data stores\n"
+        "- Operational SQL for accounts and inventory.\n"
+        "- Document store for player profiles.\n"
+        "- Redis-style cache for sessions and queues.\n"
+        "- Analytics warehouse for telemetry.\n"
+    )
+
+    result = await ingestion_service.ingest_text(filename="arch.md", text=text)
+    document = store.get_document(result.document_id)
+
+    scored_chunks = retrieval_service.retrieve_with_scores(
+        question="Which data stores does the backend use?",
+        chunks=document.chunks,
+        top_k=1,
+    )
+
+    assert "Operational SQL" in scored_chunks[0].chunk.text

@@ -15,6 +15,8 @@ from datetime import datetime, timezone
 from sqlalchemy import String, create_engine, delete, select
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column
 
+from services.schema_guard import reconcile_table
+
 
 class Base(DeclarativeBase):
     pass
@@ -51,6 +53,7 @@ class SQLiteReviewStore:
         self.db_path = db_path
         self.engine = create_engine(f"sqlite:///{db_path}")
         Base.metadata.create_all(self.engine)
+        reconcile_table(self.engine, ReviewRow)
 
     def upsert(
         self,

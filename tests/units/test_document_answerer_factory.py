@@ -4,7 +4,7 @@ from services.document_answerer import (
     FallbackDocumentAnswerer,
     RuleBasedDocumentAnswerer,
 )
-from services.document_answerer_factory import get_document_answerer
+from services.document_answerer_factory import get_document_answerer, resolve_provider
 from services.llm_document_answerer import LLMDocumentAnswerer
 from settings import Settings
 
@@ -123,3 +123,35 @@ def test_get_document_answerer_returns_openai_llm_with_rule_fallback_when_key_ex
 
     assert isinstance(answerer, FallbackDocumentAnswerer)
     assert answerer.model_name == "gpt-4.1-mini+fallback-rule"
+
+
+def test_resolve_provider_reports_configured_when_llm_built():
+    settings = Settings(
+        document_answerer_type="llm",
+        document_qa_model_client_type="fake",
+    )
+    answerer = get_document_answerer(settings)
+
+    assert resolve_provider(settings, answerer) == "fake"
+
+
+def test_resolve_provider_reports_local_when_llm_unavailable(monkeypatch):
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    monkeypatch.delenv("GOOGLE_API_KEY", raising=False)
+
+    settings = Settings(
+        document_answerer_type="llm",
+        document_qa_model_client_type="gemini",
+        document_qa_model_name="gemini-2.5-flash",
+        document_qa_fallback_to_rule=True,
+    )
+    answerer = get_document_answerer(settings)
+
+    assert resolve_provider(settings, answerer) == "local"
+
+
+def test_resolve_provider_reports_local_for_rule_type():
+    settings = Settings(document_answerer_type="rule")
+    answerer = get_document_answerer(settings)
+
+    assert resolve_provider(settings, answerer) == "local"

@@ -76,7 +76,7 @@ def toast(message: str, icon: str = "✅") -> None:
 
 
 # ---------------------------------------------------------------------------
-# "What this page demonstrates" footer
+# "How it works" footer
 # ---------------------------------------------------------------------------
 
 FOOTER_CONTENT: dict[str, dict] = {
@@ -140,7 +140,7 @@ def page_footer(page: str) -> None:
         return
 
     st.markdown("<div style='margin-top:2.5rem'></div>", unsafe_allow_html=True)
-    with st.expander("What this page demonstrates"):
+    with st.expander("How it works"):
         badges = "".join(skill_badge_html(b) for b in content["badges"])
         st.markdown(
             f'<div style="margin-bottom:var(--sp-3)">{badges}</div>'

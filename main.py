@@ -73,10 +73,11 @@ from providers.embedding_provider import embedding_provider
 from services.answerer_factory import get_answerer
 from services.answering_service import AnsweringService
 from services.chat_service import ChatService
+from services.chatbot_factory import get_chatbot
 from services.classification_service import ClassificationService
 from services.classifier_factory import get_classifier
 from services.demo_document_seeder import DemoDocumentSeeder
-from services.document_answerer_factory import get_document_answerer
+from services.document_answerer_factory import get_document_answerer, resolve_provider
 from services.document_answering_service import DocumentAnsweringService
 from services.document_ingestion_service import DocumentIngestionService
 from services.document_ingestion_worker import DocumentIngestionWorker
@@ -105,7 +106,6 @@ from services.retrieval_service import RetrievalService
 from services.review_store import SQLiteReviewStore, sqlite_review_store
 from services.risk_store import SQLiteRiskStore, sqlite_risk_store
 from services.routing_service import RoutingService
-from services.rule_based_chatbot import RuleBasedChatbot
 from services.rule_based_router import RuleBasedRouter
 from services.sqlite_document_store import sqlite_document_store
 from services.summarization_service import SummarizationService
@@ -316,19 +316,14 @@ DocumentIngestionWorkerDependency = Annotated[
 
 def get_document_answering_service() -> DocumentAnsweringService:
     settings = get_settings()
-
-    provider = (
-        settings.document_qa_model_client_type
-        if settings.document_answerer_type == "llm"
-        else "local"
-    )
+    answerer = get_document_answerer(settings)
 
     return DocumentAnsweringService(
         store=sqlite_document_store,
         retrieval_service=RetrievalService(embedding_provider),
-        answerer=get_document_answerer(settings),
+        answerer=answerer,
         usage_tracking_service=sqlite_usage_tracking_service,
-        provider=provider,
+        provider=resolve_provider(settings, answerer),
     )
 
 
@@ -339,8 +334,7 @@ DocumentAnsweringServiceDependency = Annotated[
 
 
 def get_chat_service() -> ChatService:
-    chatbot = RuleBasedChatbot()
-    return ChatService(chatbot)
+    return ChatService(get_chatbot(get_settings()))
 
 
 ChatServiceDependency = Annotated[
@@ -741,8 +735,9 @@ async def ask_document_question(
     latency_ms = (time.perf_counter() - start_time) * 1000
 
     # Unified log row: combine the audit fields with model + token + cost figures so the
-    # Logs page reads everything from one table. Token counts are estimated from the
-    # question + retrieved snippets (input) and the answer (output).
+    # Logs page reads everything from one table. Token counts come from the answering
+    # service (estimated over the full retrieved context, so they stay accurate even when
+    # the answer falls back and visible citations are stripped).
     # Reflect the configured answerer in the log: the live model when the LLM answerer
     # is selected, otherwise the rule-based path. Provider-agnostic by design.
     settings = get_settings()
@@ -751,10 +746,9 @@ async def ask_document_question(
     else:
         model_name = "rule-based"
 
-    context_proxy = " ".join(citation.snippet for citation in response.citations)
-    usage = usage_tracking_service.estimate_usage(
-        input_text=f"{request.question} {context_proxy}",
-        output_text=response.answer,
+    estimated_cost_usd = usage_tracking_service.cost_for_tokens(
+        input_tokens=response.input_tokens,
+        output_tokens=response.output_tokens,
         pricing=QUERY_LOG_PRICING,
     )
 
@@ -767,9 +761,9 @@ async def ask_document_question(
         latency_ms=latency_ms,
         retrieved_sources=response.citations,
         model_name=model_name,
-        input_tokens=usage.input_tokens,
-        output_tokens=usage.output_tokens,
-        estimated_cost_usd=usage.estimated_cost_usd,
+        input_tokens=response.input_tokens,
+        output_tokens=response.output_tokens,
+        estimated_cost_usd=estimated_cost_usd,
     )
 
     return response

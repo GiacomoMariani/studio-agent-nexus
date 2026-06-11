@@ -108,5 +108,16 @@
     "expected_was_fallback": true,
     "min_citations": 0,
     "require_retrieval_scores": false
+  },
+  {
+    "name": "data_stores_section_question",
+    "document_filename": "backend_architecture_overview.md",
+    "document_text": "# Backend Overview\n## 1. Purpose\nThis document describes the servers and the data stores behind them.\n## 8. Data stores\n- Operational SQL for accounts and inventory.\n- Document store for player profiles.\n- Redis-style cache for sessions and queues.\n- Analytics warehouse for telemetry.\n",
+    "question": "Which data stores does the backend use?",
+    "expected_answer_contains": ["Operational SQL"],
+    "expected_citation_contains": ["Data stores"],
+    "expected_was_fallback": false,
+    "min_citations": 1,
+    "require_retrieval_scores": true
   }
 ]

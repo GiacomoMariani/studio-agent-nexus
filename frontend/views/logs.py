@@ -18,13 +18,8 @@ _CSV_FIELDS = [
 ]
 
 
-def _fmt_cost(cost: float) -> str:
-    return "$0.0000" if not cost else f"${cost:.4f}"
-
-
 def _summary(logs: list[dict]) -> dict:
     stored = len(logs)
-    total_cost = sum(float(log.get("estimated_cost_usd") or 0) for log in logs)
     tokens = sum(
         int(log.get("input_tokens") or 0) + int(log.get("output_tokens") or 0)
         for log in logs
@@ -32,9 +27,8 @@ def _summary(logs: list[dict]) -> dict:
     fallbacks = sum(1 for log in logs if log.get("was_fallback"))
     return {
         "stored": stored,
-        "total_cost": total_cost,
-        "avg_cost": (total_cost / stored) if stored else 0.0,
         "tokens": tokens,
+        "avg_tokens": (round(tokens / stored) if stored else 0),
         "fallback_rate": (round(100 * fallbacks / stored) if stored else 0),
     }
 
@@ -66,8 +60,8 @@ def _to_csv(logs: list[dict]) -> str:
 
 
 def _render_entry(log: dict) -> None:
-    cost = _fmt_cost(float(log.get("estimated_cost_usd") or 0))
-    label = f"{_ts(log.get('created_at', ''))}  ·  {log.get('question', '')}  —  {cost}"
+    tokens = int(log.get("input_tokens") or 0) + int(log.get("output_tokens") or 0)
+    label = f"{_ts(log.get('created_at', ''))}  ·  {log.get('question', '')}  —  {tokens:,} tokens"
     with st.expander(label):
         st.markdown(_mode_badge(log.get("model_name", "")), unsafe_allow_html=True)
         flag = (
@@ -83,7 +77,7 @@ def _render_entry(log: dict) -> None:
         meta = {
             "Prompt tokens": f"{int(log.get('input_tokens') or 0):,}",
             "Completion tokens": f"{int(log.get('output_tokens') or 0):,}",
-            "Cost": _fmt_cost(float(log.get("estimated_cost_usd") or 0)),
+            "Total tokens": f"{tokens:,}",
             "Citations": log.get("citation_count", 0),
             "Latency": f"{round(float(log.get('latency_ms') or 0))}ms",
             "Log id": log.get("query_id", ""),
@@ -103,8 +97,8 @@ def _render_entry(log: dict) -> None:
 def render() -> None:
     page_header(
         "Log Storage",
-        "Every question, the answer returned, and the cost it incurred — persisted for "
-        "audit and cost control.",
+        "Every question, the answer returned, and the tokens it consumed — persisted for "
+        "audit and usage control.",
     )
 
     try:
@@ -118,11 +112,13 @@ def render() -> None:
     cols = st.columns(4)
     cards = [
         stat_card_html("Stored queries", str(summary["stored"]), "white", "most recent 100"),
-        stat_card_html("Total cost", _fmt_cost(summary["total_cost"]), "amber", "logged spend"),
-        stat_card_html("Avg / query", _fmt_cost(summary["avg_cost"]), "white", "cost per answer"),
+        stat_card_html("Total tokens", f"{summary['tokens']:,}", "amber", "logged usage"),
         stat_card_html(
-            "Tokens used", f"{summary['tokens']:,}", "white",
-            f"{summary['fallback_rate']}% fell back",
+            "Avg tokens / query", f"{summary['avg_tokens']:,}", "white", "tokens per answer"
+        ),
+        stat_card_html(
+            "Fallback rate", f"{summary['fallback_rate']}%", "white",
+            "fell back to rule-based",
         ),
     ]
     for col, card in zip(cols, cards, strict=False):

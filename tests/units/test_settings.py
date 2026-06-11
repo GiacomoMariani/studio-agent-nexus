@@ -131,3 +131,19 @@ def test_get_settings_reads_answerer_type(monkeypatch):
     settings = get_settings()
 
     assert settings.answerer_type == "rule"
+
+
+def test_get_settings_uses_llm_chatbot_by_default(monkeypatch):
+    monkeypatch.delenv("CHATBOT_TYPE", raising=False)
+
+    settings = get_settings()
+
+    assert settings.chatbot_type == "llm"
+
+
+def test_get_settings_reads_chatbot_type(monkeypatch):
+    monkeypatch.setenv("CHATBOT_TYPE", "RULE")
+
+    settings = get_settings()
+
+    assert settings.chatbot_type == "rule"

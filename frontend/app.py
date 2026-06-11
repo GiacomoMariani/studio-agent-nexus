@@ -7,7 +7,7 @@ Manual smoke test:
     streamlit run frontend/app.py
   - Sidebar shows wordmark, 5 nav items, provider indicator, role selector, credit.
   - Clicking a nav item switches the page and highlights it (amber).
-  - Each page shows its header, a placeholder, and the "What this page demonstrates" footer.
+  - Each page shows its header, a placeholder, and the "How it works" footer.
 """
 
 import os

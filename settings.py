@@ -62,6 +62,7 @@ class Settings:
     classifier_type: str = "llm"
     summarizer_type: str = "llm"
     answerer_type: str = "llm"
+    chatbot_type: str = "llm"
 
 
 def get_settings() -> Settings:
@@ -99,4 +100,5 @@ def get_settings() -> Settings:
         classifier_type=os.getenv("CLASSIFIER_TYPE", "llm").lower(),
         summarizer_type=os.getenv("SUMMARIZER_TYPE", "llm").lower(),
         answerer_type=os.getenv("ANSWERER_TYPE", "llm").lower(),
+        chatbot_type=os.getenv("CHATBOT_TYPE", "llm").lower(),
     )

@@ -1,5 +1,6 @@
 """Ask page — grounded Q&A wired to the real document backend."""
 
+import os
 from html import escape
 from typing import Any
 
@@ -9,6 +10,17 @@ from components import badge_html, fallback_notice, page_footer, page_header
 from fixtures import SAMPLE_QUESTIONS
 
 TOP_K = 5
+DEFAULT_SNIPPETS_SHOWN = 3
+
+
+def _snippets_shown() -> int:
+    """Max snippets rendered per source group (SOURCE_SNIPPETS_SHOWN in .env, default 3)."""
+    raw = os.getenv("SOURCE_SNIPPETS_SHOWN", "")
+    try:
+        value = int(raw)
+    except ValueError:
+        return DEFAULT_SNIPPETS_SHOWN
+    return value if value >= 1 else DEFAULT_SNIPPETS_SHOWN
 
 
 def _group_citations(citations: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -27,10 +39,26 @@ def _group_citations(citations: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 "page_number": cite.get("page_number"),
                 "best": None,
                 "snips": [],
+                "source_ids": [],
+                "passages": [],
             },
         )
+        source_id = cite.get("source_id")
+        if isinstance(source_id, int) and source_id not in group["source_ids"]:
+            group["source_ids"].append(source_id)
         if snippet and snippet not in [s for _, s in group["snips"]]:
             group["snips"].append((score if score is not None else -1.0, snippet))
+            group["passages"].append(
+                {
+                    "source_id": source_id,
+                    "snippet": snippet,
+                    "page_number": cite.get("page_number"),
+                    "vector_score": cite.get("vector_score"),
+                    "keyword_score": cite.get("keyword_score"),
+                    "hybrid_score": cite.get("hybrid_score"),
+                    "_sort": score if score is not None else -1.0,
+                }
+            )
         if score is not None and (group["best"] is None or score > group["best"]):
             group["best"] = score
             group["page_number"] = cite.get("page_number")
@@ -39,14 +67,25 @@ def _group_citations(citations: list[dict[str, Any]]) -> list[dict[str, Any]]:
     for group in groups.values():
         group["snips"].sort(key=lambda pair: pair[0], reverse=True)
         group["snippets"] = [s for _, s in group["snips"]]
+        group["passages"].sort(key=lambda passage: passage["_sort"], reverse=True)
+        group["source_ids"].sort()
         result.append(group)
     result.sort(key=lambda g: (g["best"] is not None, g["best"] or 0.0), reverse=True)
     return result
 
 
-def _score_label(best: float) -> str:
-    # Relative match within this result set (min-max normalised), not an absolute score.
-    return f"Relative match: {best * 100:.0f}%"
+def _score_breakdown(passage: dict[str, Any]) -> str:
+    # Per-type retrieval scores, relative within this result set (min-max normalised).
+    def _pct(value: object) -> str:
+        return f"{value * 100:.0f}%" if isinstance(value, (int, float)) else "—"
+
+    source_id = passage.get("source_id")
+    label = f"[{source_id}] " if isinstance(source_id, int) else ""
+    return (
+        f"{label}vector {_pct(passage.get('vector_score'))} · "
+        f"keyword {_pct(passage.get('keyword_score'))} · "
+        f"hybrid {_pct(passage.get('hybrid_score'))}"
+    )
 
 
 def _run_query(question: str) -> None:
@@ -68,6 +107,8 @@ def _run_query(question: str) -> None:
         "was_fallback": bool(response.get("was_fallback")),
         "citations": response.get("citations", []),
         "provider": response.get("provider", "local"),
+        "input_tokens": response.get("input_tokens", 0),
+        "output_tokens": response.get("output_tokens", 0),
     }
 
 
@@ -103,6 +144,13 @@ def _render_answer(item: dict[str, Any]) -> None:
             unsafe_allow_html=True,
         )
 
+        total_tokens = item.get("input_tokens", 0) + item.get("output_tokens", 0)
+        if total_tokens:
+            st.caption(
+                f"≈ {total_tokens:,} tokens "
+                f"({item.get('input_tokens', 0):,} in · {item.get('output_tokens', 0):,} out)"
+            )
+
         if item["was_fallback"]:
             fallback_notice()
             return
@@ -114,25 +162,54 @@ def _render_answer(item: dict[str, Any]) -> None:
 
         st.markdown(
             f'<div class="kicker" style="margin-top:var(--sp-4)">Sources '
-            f'<span class="badge badge--mode-openai">{len(groups)}</span></div>',
+            f'<span class="badge badge--mode-openai">{len(item["citations"])}</span></div>',
             unsafe_allow_html=True,
         )
+        snippet_limit = _snippets_shown()
         for index, group in enumerate(groups):
-            page = group.get("page_number")
-            header = f"{group['filename']}" + (f" · p.{page}" if page else "")
+            marker = "".join(f"[{sid}] " for sid in group.get("source_ids") or [])
+            header = f"{marker}{group['filename']}"
             with st.expander(header, expanded=(index == 0)):
-                for snippet in group["snippets"][:2]:
+                for passage in group["passages"][:snippet_limit]:
+                    page = passage.get("page_number")
+                    page_label = f"  ·  p.{page}" if page else ""
                     st.markdown(
-                        f'<p style="color:var(--text-faint);margin:0 0 var(--sp-2)">'
-                        f"“{escape(snippet)}”</p>",
+                        f'<p style="color:var(--text-faint);margin:0 0 2px">'
+                        f"“{escape(passage['snippet'])}”</p>",
                         unsafe_allow_html=True,
                     )
-                if isinstance(group.get("best"), (int, float)):
-                    st.caption(_score_label(group["best"]))
+                    st.caption(_score_breakdown(passage) + page_label)
+                if len(group["passages"]) > snippet_limit:
+                    st.markdown(
+                        '<p style="color:var(--text-faint);margin:0">…</p>',
+                        unsafe_allow_html=True,
+                    )
+
+
+def _pick_pending_question(
+    running: bool,
+    submitted: bool,
+    typed_question: str,
+    sample_clicked: str | None,
+) -> str | None:
+    """Choose the question to run, or None.
+
+    Returns None while a query is already running so a second submission can never
+    start until the first finishes. Otherwise a typed submission wins over a demo click.
+    """
+    if running:
+        return None
+    if submitted and typed_question.strip():
+        return typed_question.strip()
+    if sample_clicked is not None and sample_clicked.strip():
+        return sample_clicked.strip()
+    return None
 
 
 def render() -> None:
     page_header("Ask", "Ask anything. Every answer is grounded in your uploaded documents.")
+
+    running = st.session_state.get("query_running", False)
 
     with st.form("ask-form", clear_on_submit=False):
         question = st.text_area(
@@ -141,22 +218,46 @@ def render() -> None:
             label_visibility="collapsed",
             height=88,
         )
-        submitted = st.form_submit_button("Ask  →", type="primary")
+        submitted = st.form_submit_button("Ask  →", type="primary", disabled=running)
 
-    with st.expander("Try a demo question"):
+    # Answer (and the in-flight spinner) render here — right under the ask box, above the demos.
+    answer_slot = st.container()
+
+    with st.expander("Try a demo question", expanded=True):
         sample_cols = st.columns(2)
+        sample_clicked: str | None = None
         for index, sample in enumerate(SAMPLE_QUESTIONS):
             if sample_cols[index % 2].button(
-                sample, key=f"sample-{index}", use_container_width=True
+                sample,
+                key=f"sample-{index}",
+                use_container_width=True,
+                disabled=running,
             ):
-                _run_query(sample)
+                sample_clicked = sample
 
-    if submitted:
-        _run_query(question)
+    pending = _pick_pending_question(running, submitted, question, sample_clicked)
 
-    if st.session_state.get("last_error"):
-        st.error(st.session_state["last_error"])
-    elif st.session_state.get("last_answer"):
-        _render_answer(st.session_state["last_answer"])
+    if pending is not None:
+        # Lock submissions and run on the next rerun, where every button is disabled.
+        st.session_state["pending_question"] = pending
+        st.session_state["query_running"] = True
+        st.rerun()
+    elif submitted and not question.strip():
+        with answer_slot:
+            st.warning("Enter a question before asking.")
+
+    with answer_slot:
+        if running and st.session_state.get("pending_question"):
+            queued = st.session_state.pop("pending_question")
+            try:
+                _run_query(queued)
+            finally:
+                st.session_state["query_running"] = False
+            st.rerun()
+
+        if st.session_state.get("last_error"):
+            st.error(st.session_state["last_error"])
+        elif st.session_state.get("last_answer"):
+            _render_answer(st.session_state["last_answer"])
 
     page_footer("ask")

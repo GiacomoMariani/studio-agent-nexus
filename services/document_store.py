@@ -94,13 +94,15 @@ class InMemoryDocumentStore:
             for document in self._documents.values()
         ]
 
-    def delete_document(self, document_id: str) -> bool:
+    def delete_document(self, document_id: str, *, force: bool = False) -> bool:
         document = self._documents.get(document_id)
 
         if document is None:
             return False
 
-        if document.is_demo:
+        # Demo docs are protected from API/user deletion; only trusted internal
+        # callers (the seeder re-seeding from source) pass force=True to drop them.
+        if document.is_demo and not force:
             return False
 
         del self._documents[document_id]

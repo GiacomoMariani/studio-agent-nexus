@@ -42,3 +42,19 @@ def get_document_answerer(settings: Settings) -> DocumentAnswerer:
         "Unsupported DOCUMENT_ANSWERER_TYPE. "
         "Supported values: rule, llm."
     )
+
+
+def resolve_provider(settings: Settings, answerer: DocumentAnswerer) -> str:
+    """The provider that actually answered.
+
+    Returns the configured provider only when an LLM answerer was built; returns "local"
+    when the answerer is rule-based — either because DOCUMENT_ANSWERER_TYPE=rule, or because
+    the LLM was unavailable (e.g. missing key) and we fell back to the rule path.
+    """
+    if (
+        settings.document_answerer_type == "llm"
+        and not isinstance(answerer, RuleBasedDocumentAnswerer)
+    ):
+        return settings.document_qa_model_client_type
+
+    return "local"

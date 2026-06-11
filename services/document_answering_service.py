@@ -13,7 +13,7 @@ from services.exceptions import NotFoundError
 from services.retrieval_service import RetrievalService
 from services.rule_based_answerer import RuleBasedAnswerer
 from services.text_cleaning import make_snippet
-from services.usage_tracking_service import SQLiteUsageTrackingService
+from services.usage_tracking_service import SQLiteUsageTrackingService, estimate_tokens
 
 FALLBACK_ANSWER = "I could not find this information in the uploaded documents."
 
@@ -97,6 +97,7 @@ class DocumentAnsweringService:
 
         citations = [
             Citation(
+                source_id=index + 1,
                 chunk_id=scored_chunk.chunk.chunk_id,
                 filename=stored_document.filename,
                 page_number=scored_chunk.chunk.page_number,
@@ -105,7 +106,7 @@ class DocumentAnsweringService:
                 keyword_score=scored_chunk.keyword_score,
                 hybrid_score=scored_chunk.hybrid_score,
             )
-            for scored_chunk in scored_chunks
+            for index, scored_chunk in enumerate(scored_chunks)
         ]
 
         if _requires_fallback_due_to_missing_citations(
@@ -141,6 +142,8 @@ class DocumentAnsweringService:
             citations=visible_citations,
             was_fallback=answer_response.was_fallback,
             provider=self.provider,
+            input_tokens=estimate_tokens(f"{cleaned_question}\n\n{combined_context}"),
+            output_tokens=estimate_tokens(answer_response.answer),
         )
 
     async def answer_all(
@@ -215,6 +218,7 @@ class DocumentAnsweringService:
 
         citations = [
             Citation(
+                source_id=index + 1,
                 chunk_id=scored_chunk.chunk.chunk_id,
                 filename=filename_by_chunk_id.get(
                     scored_chunk.chunk.chunk_id,
@@ -226,7 +230,7 @@ class DocumentAnsweringService:
                 keyword_score=scored_chunk.keyword_score,
                 hybrid_score=scored_chunk.hybrid_score,
             )
-            for scored_chunk in scored_chunks
+            for index, scored_chunk in enumerate(scored_chunks)
         ]
 
         if _requires_fallback_due_to_missing_citations(
@@ -262,6 +266,8 @@ class DocumentAnsweringService:
             citations=visible_citations,
             was_fallback=answer_response.was_fallback,
             provider=self.provider,
+            input_tokens=estimate_tokens(f"{cleaned_question}\n\n{combined_context}"),
+            output_tokens=estimate_tokens(answer_response.answer),
         )
 
     def _snippet(self, text: str, limit: int = 160) -> str:

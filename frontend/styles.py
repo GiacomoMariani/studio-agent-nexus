@@ -190,7 +190,7 @@ html, body, [class*="css"] { font-family: var(--font); }
 .badge--status-processing { background: rgba(245,158,11,.15); color: var(--accent); }
 .badge--status-failed     { background: rgba(239,68,68,.15); color: var(--error); }
 
-/* Skill badge ("What this page demonstrates") */
+/* Skill badge ("How it works" footer) */
 .skill-badge {
     display: inline-block; background: var(--bg); border: 1px solid var(--accent);
     color: var(--accent); font-size: 0.7rem; font-weight: 600; letter-spacing: .04em;
@@ -224,7 +224,7 @@ html, body, [class*="css"] { font-family: var(--font); }
     color: var(--text-muted-on-dark);
 }
 
-/* Footer "what this demonstrates" */
+/* Footer "How it works" */
 .footer-text { color: var(--text-muted-on-dark); font-size: var(--fs-body); line-height: 1.65; }
 </style>
 """

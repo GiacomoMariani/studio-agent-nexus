@@ -198,7 +198,7 @@ class SQLiteDocumentStore:
             is_demo=bool(document_row[7]),
         )
 
-    def delete_document(self, document_id: str) -> bool:
+    def delete_document(self, document_id: str, *, force: bool = False) -> bool:
         with sqlite3.connect(self.db_path) as connection:
             cursor = connection.cursor()
 
@@ -216,7 +216,9 @@ class SQLiteDocumentStore:
             if row is None:
                 return False
 
-            if bool(row[0]):
+            # Demo docs are protected from API/user deletion; only trusted internal
+            # callers (the seeder re-seeding from source) pass force=True to drop them.
+            if bool(row[0]) and not force:
                 return False
 
             cursor.execute(

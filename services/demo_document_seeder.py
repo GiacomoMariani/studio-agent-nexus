@@ -17,17 +17,17 @@ class DemoDocumentSeeder:
         if not self.demo_dir.exists():
             return
 
-        existing_filenames = {
-            document.filename
-            for document in self.ingestion_service.store.list_documents()
-            if document.is_demo
-        }
+        # All demo copies per filename — a plain filename->id dict would silently keep
+        # only one id, leaving any accumulated duplicates in the store forever.
+        existing_demo_ids: dict[str, list[str]] = {}
+        for document in self.ingestion_service.store.list_documents():
+            if document.is_demo:
+                existing_demo_ids.setdefault(document.filename, []).append(
+                    document.document_id
+                )
 
         for path in sorted(self.demo_dir.iterdir()):
             if not path.is_file():
-                continue
-
-            if path.name in existing_filenames:
                 continue
 
             if path.suffix.lower() not in {".txt", ".md", ".pdf"}:
@@ -36,6 +36,15 @@ class DemoDocumentSeeder:
             # README files document the demo folder; they are not knowledge-base content.
             if path.stem.lower() == "readme":
                 continue
+
+            # Re-seed from source each startup so demo docs always reflect the current
+            # ingestion/chunking pipeline; drop every stale copy first (duplicates can
+            # accumulate, e.g. from two processes seeding the same db). force=True
+            # bypasses the store's demo-deletion guard (which blocks API/user deletes).
+            for stale_document_id in existing_demo_ids.get(path.name, []):
+                self.ingestion_service.store.delete_document(
+                    stale_document_id, force=True
+                )
 
             text = self._read_text(path)
 

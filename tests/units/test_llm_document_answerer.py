@@ -140,7 +140,9 @@ async def test_llm_document_answerer_allows_model_fallback_without_citation():
 
 
 @pytest.mark.asyncio
-async def test_llm_document_answerer_falls_back_when_answer_has_no_valid_source_citation():
+async def test_llm_document_answerer_accepts_answer_without_inline_citation():
+    # The retrieved sources are shown anyway, so a missing [N] marker must not discard a
+    # grounded answer (open models cite less reliably than OpenAI).
     model_client = StubModelClient(
         response="Refunds are available within 30 days."
     )
@@ -158,31 +160,8 @@ async def test_llm_document_answerer_falls_back_when_answer_has_no_valid_source_
         ],
     )
 
-    assert result.answer == FALLBACK_ANSWER
-    assert result.was_fallback is True
-
-
-@pytest.mark.asyncio
-async def test_llm_document_answerer_falls_back_when_answer_cites_unknown_source():
-    model_client = StubModelClient(
-        response="Refunds are available within 30 days. [9]"
-    )
-    answerer = LLMDocumentAnswerer(model_client=model_client)
-
-    result = await answerer.answer(
-        question="What is the refund policy?",
-        context_blocks=[
-            RetrievedContextBlock(
-                source_id=1,
-                filename="policy.pdf",
-                page_number=4,
-                text="Refunds are available within 30 days.",
-            )
-        ],
-    )
-
-    assert result.answer == FALLBACK_ANSWER
-    assert result.was_fallback is True
+    assert result.answer == "Refunds are available within 30 days."
+    assert result.was_fallback is False
 
 
 @pytest.mark.asyncio

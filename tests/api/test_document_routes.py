@@ -445,8 +445,11 @@ def test_ask_documents_without_document_id_searches_all_documents():
     assert "FastAPI" in payload["answer"]
     assert payload["was_fallback"] is False
     assert payload["provider"] == "local"
+    assert payload["input_tokens"] > 0
+    assert payload["output_tokens"] > 0
     assert len(payload["citations"]) >= 1
     assert payload["citations"][0]["filename"] == "backend-guide.txt"
+    assert payload["citations"][0]["source_id"] == 1
 
 def test_ask_document_returns_404_for_unknown_document():
     response = client.post(

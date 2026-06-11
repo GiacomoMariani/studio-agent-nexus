@@ -25,6 +25,7 @@ class DocumentAskRequest(BaseModel):
 
 
 class Citation(BaseModel):
+    source_id: int | None = None
     chunk_id: str
     filename: str
     page_number: int | None = None
@@ -58,6 +59,8 @@ class DocumentAskResponse(BaseModel):
     citations: list[Citation]
     was_fallback: bool = False
     provider: str = "local"
+    input_tokens: int = 0
+    output_tokens: int = 0
 
 
 class DocumentReindexResponse(BaseModel):

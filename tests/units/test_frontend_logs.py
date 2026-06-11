@@ -10,26 +10,22 @@ if FRONTEND_DIR not in sys.path:
 from views import logs  # noqa: E402
 
 
-def test_summary_aggregates_cost_tokens_and_fallback():
+def test_summary_aggregates_tokens_and_fallback():
     rows = [
-        {"estimated_cost_usd": 0.0008, "input_tokens": 1000,
-         "output_tokens": 200, "was_fallback": False},
-        {"estimated_cost_usd": 0.0004, "input_tokens": 500,
-         "output_tokens": 100, "was_fallback": False},
-        {"estimated_cost_usd": 0.0, "input_tokens": 50,
-         "output_tokens": 0, "was_fallback": True},
+        {"input_tokens": 1000, "output_tokens": 200, "was_fallback": False},
+        {"input_tokens": 500, "output_tokens": 100, "was_fallback": False},
+        {"input_tokens": 50, "output_tokens": 0, "was_fallback": True},
     ]
     s = logs._summary(rows)
     assert s["stored"] == 3
-    assert round(s["total_cost"], 4) == 0.0012
     assert s["tokens"] == 1000 + 200 + 500 + 100 + 50
-    assert round(s["avg_cost"], 4) == 0.0004
+    assert s["avg_tokens"] == 617  # 1850 / 3, rounded
     assert s["fallback_rate"] == 33  # 1 of 3
 
 
 def test_summary_empty():
     s = logs._summary([])
-    assert s == {"stored": 0, "total_cost": 0.0, "avg_cost": 0.0, "tokens": 0, "fallback_rate": 0}
+    assert s == {"stored": 0, "tokens": 0, "avg_tokens": 0, "fallback_rate": 0}
 
 
 def test_mode_badge_maps_provider_by_model():

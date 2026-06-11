@@ -1,9 +1,13 @@
+import logging
+
 from models.answering import AnswerResponse
 from providers.model_client import ModelClient
 from services.document_qa_prompt_builder import (
     RetrievedContextBlock,
     build_document_qa_prompt,
 )
+
+logger = logging.getLogger(__name__)
 
 FALLBACK_ANSWER = (
     "I could not find this information in the uploaded documents."
@@ -18,7 +22,6 @@ class LLMDocumentAnswerer:
             "model_name",
             model_client.__class__.__name__,
         )
-
 
     async def answer(
         self,
@@ -40,21 +43,19 @@ class LLMDocumentAnswerer:
         answer = raw_answer.strip()
 
         if not answer:
+            logger.warning("LLM returned an empty answer; using fallback.")
             return AnswerResponse(
                 answer=FALLBACK_ANSWER,
                 was_fallback=True,
             )
 
+        # The retrieved sources are shown alongside the answer, so a missing inline [N]
+        # marker no longer discards an otherwise-grounded answer (open models cite less
+        # reliably than OpenAI). Only an explicit "not found" from the model is a fallback.
         was_fallback = _looks_like_fallback(answer)
 
-        if not was_fallback and not _has_valid_source_citation(
-                answer=answer,
-                context_blocks=context_blocks,
-        ):
-            return AnswerResponse(
-                answer=FALLBACK_ANSWER,
-                was_fallback=True,
-            )
+        if was_fallback:
+            logger.info("LLM declined to answer from the retrieved context.")
 
         return AnswerResponse(
             answer=answer,
@@ -74,17 +75,3 @@ def _looks_like_fallback(answer: str) -> bool:
     ]
 
     return any(marker in lowered for marker in fallback_markers)
-
-def _has_valid_source_citation(
-    answer: str,
-    context_blocks: list[RetrievedContextBlock],
-) -> bool:
-    valid_source_markers = {
-        f"[{block.source_id}]"
-        for block in context_blocks
-    }
-
-    return any(
-        marker in answer
-        for marker in valid_source_markers
-    )

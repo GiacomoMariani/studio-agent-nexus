@@ -74,9 +74,9 @@ def _suggestion_card(item: dict, can_export: bool) -> None:
     with st.container(border=True):
         st.markdown(
             f'{_badges_html(item, with_state=False)}'
-            f'<div style="font-weight:600;color:var(--text-on-light);margin-top:var(--sp-3)">'
+            f'<div style="font-weight:600;color:var(--text-on-dark);margin-top:var(--sp-3)">'
             f'{escape(item.get("title", ""))}</div>'
-            f'<div style="color:var(--text-muted-on-light);font-style:italic;font-size:0.875rem;'
+            f'<div style="color:var(--text-muted-on-dark);font-style:italic;font-size:0.875rem;'
             f'margin-top:4px">Why: {escape(item.get("reason", ""))}</div>',
             unsafe_allow_html=True,
         )

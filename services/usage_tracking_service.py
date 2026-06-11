@@ -33,6 +33,15 @@ class UsagePricing:
     output_cost_per_1k_tokens_usd: float
 
 
+def estimate_tokens(text: str) -> int:
+    cleaned = text.strip()
+
+    if not cleaned:
+        return 0
+
+    return max(1, round(len(cleaned) / 4))
+
+
 class SQLiteUsageTrackingService:
     def __init__(
         self,
@@ -91,6 +100,18 @@ class SQLiteUsageTrackingService:
             input_tokens=input_tokens,
             output_tokens=output_tokens,
             estimated_cost_usd=estimated_cost_usd,
+        )
+
+    def cost_for_tokens(
+        self,
+        input_tokens: int,
+        output_tokens: int,
+        pricing: UsagePricing | None = None,
+    ) -> float:
+        return self._estimate_cost(
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+            pricing=pricing or self.default_pricing,
         )
 
     def record_usage(
@@ -242,12 +263,7 @@ class SQLiteUsageTrackingService:
             connection.commit()
 
     def _estimate_tokens(self, text: str) -> int:
-        cleaned = text.strip()
-
-        if not cleaned:
-            return 0
-
-        return max(1, round(len(cleaned) / 4))
+        return estimate_tokens(text)
 
     def _estimate_cost(
         self,

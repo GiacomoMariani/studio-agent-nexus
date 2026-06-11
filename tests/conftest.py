@@ -78,6 +78,7 @@ def force_local_answerer(monkeypatch):
     monkeypatch.setenv("CLASSIFIER_TYPE", "rule")
     monkeypatch.setenv("SUMMARIZER_TYPE", "rule")
     monkeypatch.setenv("ANSWERER_TYPE", "rule")
+    monkeypatch.setenv("CHATBOT_TYPE", "rule")
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     monkeypatch.delenv("GEMINI_API_KEY", raising=False)
     monkeypatch.delenv("GOOGLE_API_KEY", raising=False)
