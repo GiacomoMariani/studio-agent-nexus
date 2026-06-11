@@ -33,3 +33,21 @@ def test_sort_handles_unknown_priority_last():
 
 def test_sort_empty():
     assert board._sort_items([]) == []
+
+
+def test_issue_badge_maps_each_type():
+    assert "badge--issue-story" in board._issue_badge("Story")
+    assert "badge--issue-bug" in board._issue_badge("Bug")
+    # Unknown issue type falls back to the task badge rather than breaking.
+    assert "badge--issue-task" in board._issue_badge("Mystery")
+
+
+def test_resolve_scope_document_id():
+    documents = [
+        {"filename": "a.md", "document_id": "d1"},
+        {"filename": "b.pdf", "document_id": "d2"},
+    ]
+    assert board._resolve_scope_document_id(board.ALL_DOCS, documents) is None
+    assert board._resolve_scope_document_id("b.pdf", documents) == "d2"
+    # A filename not present resolves to None (treated as no specific scope).
+    assert board._resolve_scope_document_id("missing.md", documents) is None

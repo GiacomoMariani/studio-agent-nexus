@@ -98,6 +98,7 @@ class DocumentAnsweringService:
         citations = [
             Citation(
                 source_id=index + 1,
+                document_id=document_id,
                 chunk_id=scored_chunk.chunk.chunk_id,
                 filename=stored_document.filename,
                 page_number=scored_chunk.chunk.page_number,
@@ -176,6 +177,12 @@ class DocumentAnsweringService:
             for chunk in document.chunks
         }
 
+        document_id_by_chunk_id = {
+            chunk.chunk_id: document.document_id
+            for document in documents
+            for chunk in document.chunks
+        }
+
         scored_chunks = self.retrieval_service.retrieve_with_scores(
             question=cleaned_question,
             chunks=chunks,
@@ -219,6 +226,7 @@ class DocumentAnsweringService:
         citations = [
             Citation(
                 source_id=index + 1,
+                document_id=document_id_by_chunk_id.get(scored_chunk.chunk.chunk_id),
                 chunk_id=scored_chunk.chunk.chunk_id,
                 filename=filename_by_chunk_id.get(
                     scored_chunk.chunk.chunk_id,

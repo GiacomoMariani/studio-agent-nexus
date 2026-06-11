@@ -189,6 +189,10 @@ html, body, [class*="css"] { font-family: var(--font); }
 .badge--status-indexed    { background: rgba(34,197,94,.15); color: var(--success); }
 .badge--status-processing { background: rgba(245,158,11,.15); color: var(--accent); }
 .badge--status-failed     { background: rgba(239,68,68,.15); color: var(--error); }
+.badge--issue-story { background: rgba(99,102,241,.15); color: var(--dept-data); }
+.badge--issue-task  { background: rgba(59,130,246,.15); color: var(--info); }
+.badge--issue-bug   { background: rgba(239,68,68,.15); color: var(--error); }
+.badge--issue-epic  { background: rgba(139,92,246,.15); color: var(--dept-infra); }
 
 /* Skill badge ("How it works" footer) */
 .skill-badge {

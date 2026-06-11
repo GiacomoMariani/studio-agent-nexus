@@ -26,6 +26,7 @@ class DocumentAskRequest(BaseModel):
 
 class Citation(BaseModel):
     source_id: int | None = None
+    document_id: str | None = None
     chunk_id: str
     filename: str
     page_number: int | None = None
@@ -52,6 +53,13 @@ class DocumentListResponse(BaseModel):
 class DocumentDeleteResponse(BaseModel):
     document_id: str
     deleted: bool
+
+
+class DocumentContentResponse(BaseModel):
+    document_id: str
+    filename: str
+    file_type: str
+    content: str
 
 
 class DocumentAskResponse(BaseModel):

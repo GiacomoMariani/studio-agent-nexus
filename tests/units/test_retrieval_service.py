@@ -1,3 +1,5 @@
+import math
+
 import pytest
 
 from providers.embedding_provider import LocalEmbeddingProvider
@@ -206,3 +208,54 @@ async def test_section_that_lists_outranks_passing_mention():
     )
 
     assert "Operational SQL" in scored_chunks[0].chunk.text
+
+
+def test_relevance_floor_filters_by_raw_vector_score():
+    # query embeds to [1,0]; chunk cosines are 1.0, 0.4, 0.0 — a 0.5 floor keeps only the first.
+    service = RetrievalService(FakeEmbeddingProvider(), min_score=0.5)
+
+    chunks = [
+        StoredChunk(chunk_id="high", text="x", embedding=[1.0, 0.0]),
+        StoredChunk(chunk_id="mid", text="y", embedding=[0.4, math.sqrt(1 - 0.16)]),
+        StoredChunk(chunk_id="low", text="z", embedding=[0.0, 1.0]),
+    ]
+
+    scored = service.retrieve_with_scores("anything", chunks, top_k=5)
+
+    assert [scored_chunk.chunk.chunk_id for scored_chunk in scored] == ["high"]
+
+
+def test_relevance_floor_drops_off_topic_with_real_embeddings():
+    provider = LocalEmbeddingProvider()
+    service = RetrievalService(provider, min_score=0.3)
+
+    chunks = [
+        StoredChunk(
+            chunk_id="c1",
+            text="FastAPI is the backend framework used in this project.",
+            embedding=provider.embed_document(
+                "FastAPI is the backend framework used in this project."
+            ),
+        )
+    ]
+
+    # In-scope question clears the floor; an off-topic one falls below it → empty (fallback).
+    assert len(service.retrieve("What backend framework is used?", chunks, top_k=3)) == 1
+    assert service.retrieve("How do I bake sourdough bread?", chunks, top_k=3) == []
+
+
+def test_no_floor_by_default_keeps_weak_matches():
+    provider = LocalEmbeddingProvider()
+    service = RetrievalService(provider)  # min_score defaults to 0.0 — floor off
+
+    chunks = [
+        StoredChunk(
+            chunk_id="c1",
+            text="FastAPI is the backend framework used in this project.",
+            embedding=provider.embed_document(
+                "FastAPI is the backend framework used in this project."
+            ),
+        )
+    ]
+
+    assert len(service.retrieve("How do I bake sourdough bread?", chunks, top_k=3)) == 1

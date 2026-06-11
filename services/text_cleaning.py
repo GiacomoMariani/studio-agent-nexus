@@ -15,8 +15,10 @@ _PAGE_MARKER = re.compile(r"\[Page\s+\d+\]", re.IGNORECASE)
 _HEADING_MARKER = re.compile(r"(?:^|(?<=\s))#{1,6}\s+")
 # List bullets ("- ", "* ", "• ") at the start or after a space.
 _LIST_BULLET = re.compile(r"(?:^|(?<=\s))[-*•]\s+")
-# Emphasis / inline-code markers.
-_EMPHASIS = re.compile(r"\*\*|\*|__|_|`")
+# Asterisk emphasis (**bold**, *italic*) and inline code (`code`). Underscores are left
+# intact so snake_case identifiers in the docs (event_id, match_events) aren't mangled into
+# "eventid" / "matchevents" in citation snippets.
+_EMPHASIS = re.compile(r"\*\*|\*|`")
 
 
 def to_plain_text(text: str) -> str:

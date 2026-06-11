@@ -47,6 +47,32 @@ def _get_bool_env(name: str, default: bool) -> bool:
     )
 
 
+def _get_float_env(
+    name: str,
+    default: float,
+    *,
+    min_value: float | None = None,
+    max_value: float | None = None,
+) -> float:
+    raw_value = os.getenv(name)
+
+    if raw_value is None:
+        return default
+
+    try:
+        value = float(raw_value)
+    except ValueError as ex:
+        raise ValueError(f"{name} must be a number.") from ex
+
+    if min_value is not None and value < min_value:
+        raise ValueError(f"{name} must be at least {min_value}.")
+
+    if max_value is not None and value > max_value:
+        raise ValueError(f"{name} must be at most {max_value}.")
+
+    return value
+
+
 @dataclass(frozen=True)
 class Settings:
     extractor_type: str = "rule"
@@ -63,6 +89,11 @@ class Settings:
     summarizer_type: str = "llm"
     answerer_type: str = "llm"
     chatbot_type: str = "llm"
+    risk_detector_type: str = "llm"
+    risk_detection_fallback_to_rule: bool = True
+    jira_task_generator_type: str = "llm"
+    jira_task_generation_fallback_to_rule: bool = True
+    retrieval_min_score: float = 0.3
 
 
 def get_settings() -> Settings:
@@ -101,4 +132,20 @@ def get_settings() -> Settings:
         summarizer_type=os.getenv("SUMMARIZER_TYPE", "llm").lower(),
         answerer_type=os.getenv("ANSWERER_TYPE", "llm").lower(),
         chatbot_type=os.getenv("CHATBOT_TYPE", "llm").lower(),
+        risk_detector_type=os.getenv("RISK_DETECTOR_TYPE", "llm").lower(),
+        risk_detection_fallback_to_rule=_get_bool_env(
+            "RISK_DETECTION_FALLBACK_TO_RULE",
+            default=True,
+        ),
+        jira_task_generator_type=os.getenv("JIRA_TASK_GENERATOR_TYPE", "llm").lower(),
+        jira_task_generation_fallback_to_rule=_get_bool_env(
+            "JIRA_TASK_GENERATION_FALLBACK_TO_RULE",
+            default=True,
+        ),
+        retrieval_min_score=_get_float_env(
+            "RETRIEVAL_MIN_SCORE",
+            default=0.3,
+            min_value=0.0,
+            max_value=1.0,
+        ),
     )

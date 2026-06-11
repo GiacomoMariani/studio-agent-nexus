@@ -37,6 +37,15 @@ def test_group_citations_dedupes_identical_snippets():
     assert groups[0]["best"] == 0.7
 
 
+def test_group_citations_carries_document_id_for_download():
+    citations = [
+        {"filename": "a.md", "document_id": "doc-1", "snippet": "x", "hybrid_score": 0.9},
+        {"filename": "a.md", "document_id": "doc-1", "snippet": "y", "hybrid_score": 0.5},
+    ]
+    groups = ask._group_citations(citations)
+    assert groups[0]["document_id"] == "doc-1"
+
+
 def test_group_citations_handles_empty():
     assert ask._group_citations([]) == []
 

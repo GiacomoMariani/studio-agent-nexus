@@ -36,6 +36,7 @@ def _group_citations(citations: list[dict[str, Any]]) -> list[dict[str, Any]]:
             filename,
             {
                 "filename": filename,
+                "document_id": cite.get("document_id"),
                 "page_number": cite.get("page_number"),
                 "best": None,
                 "snips": [],
@@ -127,6 +128,34 @@ def _provider_badge(provider: str) -> str:
     return badge_html(label, css_class)
 
 
+@st.cache_data(show_spinner=False)
+def _source_content(document_id: str) -> dict[str, Any] | None:
+    """Fetch a source document's stored text once per session (cached by id)."""
+    try:
+        return api.get_document_content(document_id)
+    except api.ApiError:
+        return None
+
+
+def _render_source_download(group: dict[str, Any]) -> None:
+    document_id = group.get("document_id")
+    if not document_id:
+        return
+    content = _source_content(document_id)
+    if not content:
+        return
+    filename = content.get("filename", "source.txt")
+    # A PDF's stored content is its extracted text, not the original binary — name it .txt.
+    download_name = f"{filename}.txt" if filename.lower().endswith(".pdf") else filename
+    st.download_button(
+        "⬇  Download source",
+        data=content.get("content", ""),
+        file_name=download_name,
+        mime="text/plain",
+        key=f"dl-{document_id}",
+    )
+
+
 def _render_answer(item: dict[str, Any]) -> None:
     mode_badge = _provider_badge(item.get("provider", "local"))
 
@@ -184,6 +213,8 @@ def _render_answer(item: dict[str, Any]) -> None:
                         '<p style="color:var(--text-faint);margin:0">…</p>',
                         unsafe_allow_html=True,
                     )
+
+                _render_source_download(group)
 
 
 def _pick_pending_question(

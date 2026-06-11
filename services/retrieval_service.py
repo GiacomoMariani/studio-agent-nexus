@@ -53,6 +53,7 @@ class RetrievalService:
         embedding_provider: LocalEmbeddingProvider,
         vector_weight: float = 0.7,
         keyword_weight: float = 0.3,
+        min_score: float = 0.0,
     ):
         if vector_weight < 0:
             raise ValueError("vector_weight must be greater than or equal to 0.")
@@ -66,6 +67,8 @@ class RetrievalService:
         self.embedding_provider = embedding_provider
         self.vector_weight = vector_weight
         self.keyword_weight = keyword_weight
+        # Minimum raw cosine a chunk must reach to be retrieved (0.0 = no floor).
+        self.min_score = min_score
 
     def retrieve(
         self,
@@ -108,6 +111,20 @@ class RetrievalService:
                     chunk,
                 )
             )
+
+        # Relevance floor: drop chunks below the raw (pre-normalization) cosine threshold so
+        # weakly-relevant chunks aren't cited. This must gate on the raw vector_score (an
+        # absolute cosine — embeddings are L2-normalized), NOT the normalized score, which
+        # forces the batch top to 1.0 and would never fail a floor. Empty result → the
+        # answering service returns its safe fallback.
+        raw_scored_chunks = [
+            scored_chunk
+            for scored_chunk in raw_scored_chunks
+            if scored_chunk[0] >= self.min_score
+        ]
+
+        if not raw_scored_chunks:
+            return []
 
         normalized_vector_scores = self._normalize_scores(
             [item[0] for item in raw_scored_chunks]

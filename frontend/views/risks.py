@@ -3,7 +3,6 @@
 "Scan for risks" is a demo gesture that reveals the findings stored in the database.
 """
 
-import time
 from html import escape
 
 import api
@@ -97,10 +96,14 @@ def render() -> None:
         "Re-scan" if scanned else "Scan for risks →",
         type="secondary" if scanned else "primary",
     ):
-        with st.spinner("Scanning…"):
-            time.sleep(1.0)
-        st.session_state["risks_scanned"] = True
-        st.rerun()
+        try:
+            with st.spinner("Scanning documents for risks and contradictions…"):
+                api.scan_risks()
+        except api.ApiError as exc:
+            st.error(str(exc))
+        else:
+            st.session_state["risks_scanned"] = True
+            st.rerun()
 
     if not scanned:
         placeholder("Scan your documents to surface risks, gaps, and contradictions.")

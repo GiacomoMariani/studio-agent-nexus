@@ -28,6 +28,7 @@ from models.classification import ClassifyRequest, ClassifyResponse
 from models.document_qa import (
     DocumentAskRequest,
     DocumentAskResponse,
+    DocumentContentResponse,
     DocumentDeleteResponse,
     DocumentIngestionJobResponse,
     DocumentListResponse,
@@ -48,6 +49,11 @@ from models.health import HealthResponse
 from models.ingestion_queue_model import (
     DocumentReindexIngestionPayload,
     StoredTextUploadIngestionPayload,
+)
+from models.jira_task import (
+    JiraTaskDraft,
+    JiraTaskGenerateRequest,
+    jira_task_schema,
 )
 from models.maintenance import (
     UploadedTextCleanupRequest,
@@ -97,6 +103,8 @@ from services.ingestion_queue import (
     DocumentIngestionQueue,
     FastAPIBackgroundTasksIngestionQueue,
 )
+from services.jira_task_generation_service import JiraTaskGenerationService
+from services.jira_task_generator_factory import get_jira_task_generator
 from services.pdf_parser import extract_pdf_pages
 from services.planning_suggestion_store import (
     SQLiteSuggestionStore,
@@ -104,6 +112,8 @@ from services.planning_suggestion_store import (
 )
 from services.retrieval_service import RetrievalService
 from services.review_store import SQLiteReviewStore, sqlite_review_store
+from services.risk_detection_service import RiskDetectionService
+from services.risk_detector_factory import get_risk_detector
 from services.risk_store import SQLiteRiskStore, sqlite_risk_store
 from services.routing_service import RoutingService
 from services.rule_based_router import RuleBasedRouter
@@ -320,7 +330,10 @@ def get_document_answering_service() -> DocumentAnsweringService:
 
     return DocumentAnsweringService(
         store=sqlite_document_store,
-        retrieval_service=RetrievalService(embedding_provider),
+        retrieval_service=RetrievalService(
+            embedding_provider,
+            min_score=settings.retrieval_min_score,
+        ),
         answerer=answerer,
         usage_tracking_service=sqlite_usage_tracking_service,
         provider=resolve_provider(settings, answerer),
@@ -413,6 +426,33 @@ def get_risk_store() -> SQLiteRiskStore:
 RiskStoreDependency = Annotated[
     SQLiteRiskStore,
     Depends(get_risk_store),
+]
+
+
+def get_risk_detection_service() -> RiskDetectionService:
+    return RiskDetectionService(
+        document_store=sqlite_document_store,
+        risk_store=sqlite_risk_store,
+        detector=get_risk_detector(get_settings()),
+    )
+
+
+RiskDetectionServiceDependency = Annotated[
+    RiskDetectionService,
+    Depends(get_risk_detection_service),
+]
+
+
+def get_jira_task_generation_service() -> JiraTaskGenerationService:
+    return JiraTaskGenerationService(
+        document_store=sqlite_document_store,
+        generator=get_jira_task_generator(get_settings()),
+    )
+
+
+JiraTaskGenerationServiceDependency = Annotated[
+    JiraTaskGenerationService,
+    Depends(get_jira_task_generation_service),
 ]
 
 
@@ -607,6 +647,25 @@ async def list_documents() -> DocumentListResponse:
             )
             for document in documents
         ]
+    )
+
+
+@app.get(
+    "/documents/{document_id}/content",
+    response_model=DocumentContentResponse,
+    dependencies=[Depends(require_api_key)],
+)
+async def get_document_content(document_id: str) -> DocumentContentResponse:
+    document = sqlite_document_store.get_document(document_id)
+
+    if document is None:
+        raise HTTPException(status_code=404, detail="Document not found.")
+
+    return DocumentContentResponse(
+        document_id=document.document_id,
+        filename=document.filename,
+        file_type=document.file_type,
+        content=document.original_text,
     )
 
 
@@ -1203,3 +1262,46 @@ async def delete_risk(
         raise HTTPException(status_code=404, detail="Risk not found.")
 
     return {"risk_id": risk_id, "deleted": True}
+
+
+@app.post(
+    "/admin/risks/detect",
+    response_model=list[RiskResponse],
+    dependencies=[Depends(require_api_key)],
+)
+async def detect_risks(
+    service: RiskDetectionServiceDependency,
+) -> list[RiskResponse]:
+    # On-demand scan: refreshes the auto-detected findings (deletes prior auto-* and
+    # re-inserts), leaving hand-posted risks untouched. Returns the stored findings.
+    try:
+        records = await service.detect_and_store()
+    except AppServiceError as ex:
+        raise HTTPException(status_code=500, detail=str(ex)) from ex
+
+    return [RiskResponse(**record) for record in records]
+
+
+@app.post(
+    "/admin/jira-tasks/generate",
+    response_model=list[JiraTaskDraft],
+    dependencies=[Depends(require_api_key)],
+)
+async def generate_jira_tasks(
+    request: JiraTaskGenerateRequest,
+    service: JiraTaskGenerationServiceDependency,
+) -> list[JiraTaskDraft]:
+    # Ephemeral: generate Jira-shaped drafts from the selected document (or all documents
+    # when document_id is null) and return them. Nothing is persisted.
+    try:
+        return await service.generate(request.document_id)
+    except AppServiceError as ex:
+        raise HTTPException(status_code=500, detail=str(ex)) from ex
+
+
+@app.get(
+    "/admin/jira-tasks/schema",
+    dependencies=[Depends(require_api_key)],
+)
+async def get_jira_tasks_schema() -> dict:
+    return jira_task_schema()

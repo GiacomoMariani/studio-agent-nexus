@@ -9,6 +9,7 @@ from html import escape
 import api
 import streamlit as st
 from components import (
+    badge_html,
     dept_badge_html,
     page_footer,
     page_header,
@@ -93,6 +94,122 @@ def _suggestion_card(item: dict, can_export: bool) -> None:
             st.caption("Switch to Project Manager to export to backlog.")
 
 
+# --- Draft Jira tasks (ticket-017): board-top generator, ephemeral preview ---------------
+
+JIRA_STUB_MESSAGE = "Missing Project Manager pass — Jira sync not configured"
+_ISSUE_BADGE_CLASS = {
+    "Story": "badge--issue-story",
+    "Task": "badge--issue-task",
+    "Bug": "badge--issue-bug",
+    "Epic": "badge--issue-epic",
+}
+
+
+def _issue_badge(issue_type: str) -> str:
+    return badge_html(issue_type, _ISSUE_BADGE_CLASS.get(issue_type, "badge--issue-task"))
+
+
+def _resolve_scope_document_id(selected: str, documents: list[dict]) -> str | None:
+    """Map the panel's document selection to a document_id (None ⇒ all documents)."""
+    if selected == ALL_DOCS:
+        return None
+    for document in documents:
+        if document.get("filename") == selected:
+            return document.get("document_id")
+    return None
+
+
+def _jira_draft_card(draft: dict) -> None:
+    labels = "".join(
+        badge_html(str(label), "badge--mode-local") for label in draft.get("labels", [])
+    )
+    criteria = "".join(
+        f"<li>{escape(str(c))}</li>" for c in draft.get("acceptance_criteria", [])
+    )
+    points = draft.get("story_points")
+    points_html = (
+        f'<span class="muted-caption">{escape(str(points))} pts</span>' if points else ""
+    )
+    labels_html = (
+        '<div style="display:flex;gap:var(--sp-2);flex-wrap:wrap;margin-top:var(--sp-3)">'
+        f"{labels}</div>"
+        if labels
+        else ""
+    )
+    criteria_html = (
+        '<div class="muted-caption" style="margin-top:var(--sp-3)">Acceptance criteria</div>'
+        f'<ul style="margin:4px 0 0 1.1rem;color:var(--text-muted-on-dark);'
+        f'font-size:0.85rem">{criteria}</ul>'
+        if criteria
+        else ""
+    )
+    with st.container(border=True):
+        st.markdown(
+            '<div style="display:flex;gap:var(--sp-2);align-items:center;flex-wrap:wrap">'
+            f'{_issue_badge(draft.get("issue_type", ""))}'
+            f'{priority_badge_html(draft.get("priority", ""))}'
+            f'{dept_badge_html(draft.get("department", ""))}{points_html}</div>'
+            f'<div style="font-weight:600;color:var(--text-on-dark);margin-top:var(--sp-3)">'
+            f'{escape(draft.get("summary", ""))}</div>'
+            f'<div style="color:var(--text-muted-on-dark);font-size:0.875rem;margin-top:4px">'
+            f'{escape(draft.get("description", ""))}</div>'
+            f"{labels_html}{criteria_html}"
+            f'<div class="muted-caption" style="margin-top:var(--sp-3)">'
+            f'Source: {escape(draft.get("source", ""))}</div>',
+            unsafe_allow_html=True,
+        )
+        if st.button("Confirm on Jira", key=f"jira-confirm-{draft.get('draft_id', '')}"):
+            # Deliberate stub: no Jira connection, no persistence, shown to every role.
+            st.warning(JIRA_STUB_MESSAGE)
+
+
+def _jira_task_panel(documents: list[dict]) -> None:
+    st.markdown(
+        '<div class="kicker" style="color:var(--accent)">✦ Draft Jira tasks</div>'
+        '<h2 style="margin:4px 0 var(--sp-3)">Generate task drafts from your documents</h2>',
+        unsafe_allow_html=True,
+    )
+    st.caption(
+        "Generate Jira-shaped task drafts and review them before they'd go to Jira. "
+        "Drafts are not saved."
+    )
+
+    doc_names = sorted({d.get("filename", "") for d in documents if d.get("filename")})
+    selected = st.selectbox("Generate from", [ALL_DOCS, *doc_names], key="jira_gen_scope")
+
+    left, right = st.columns([1, 1])
+    with left:
+        if st.button("Generate tasks →", type="primary", key="jira_generate"):
+            document_id = _resolve_scope_document_id(selected, documents)
+            try:
+                with st.spinner("Generating Jira task drafts…"):
+                    st.session_state["jira_task_drafts"] = api.generate_jira_tasks(document_id)
+            except api.ApiError as exc:
+                st.error(str(exc))
+            else:
+                st.rerun()
+    with right:
+        if st.session_state.get("jira_task_drafts") is not None:
+            if st.button("Clear drafts", key="jira_clear"):
+                st.session_state.pop("jira_task_drafts", None)
+                st.rerun()
+
+    drafts = st.session_state.get("jira_task_drafts")
+    if drafts is None:
+        return
+    if not drafts:
+        st.caption("No tasks generated for this selection.")
+        return
+
+    st.markdown(
+        f'<div class="stats-line" style="margin:var(--sp-3) 0">'
+        f"{len(drafts)} draft task(s) · not saved</div>",
+        unsafe_allow_html=True,
+    )
+    for draft in drafts:
+        _jira_draft_card(draft)
+
+
 def render() -> None:
     page_header(
         "Board",
@@ -108,6 +225,10 @@ def render() -> None:
         st.error(str(exc))
         page_footer("board")
         return
+
+    # Draft Jira tasks (ticket-017) — board-top generator; ephemeral, persists nothing.
+    _jira_task_panel(documents)
+    st.divider()
 
     # Source-document scope (Q3)
     doc_names = sorted({d.get("filename", "") for d in documents if d.get("filename")})

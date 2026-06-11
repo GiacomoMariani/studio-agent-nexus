@@ -17,6 +17,14 @@ def test_to_plain_text_does_not_strip_hash_without_space():
     assert to_plain_text("Built in C# today") == "Built in C# today"
 
 
+def test_to_plain_text_preserves_snake_case_identifiers():
+    # Underscores in field/topic names appear throughout the docs (event_id, match_events)
+    # and must survive; only asterisk emphasis is stripped.
+    assert to_plain_text("Topics: match_events and **auth_events**.") == (
+        "Topics: match_events and auth_events."
+    )
+
+
 def test_to_plain_text_collapses_whitespace_and_handles_empty():
     assert to_plain_text("  a\n\n  b   c ") == "a b c"
     assert to_plain_text("") == ""

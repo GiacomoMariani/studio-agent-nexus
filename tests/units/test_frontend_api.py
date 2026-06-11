@@ -97,3 +97,19 @@ def test_upload_sends_multipart(monkeypatch):
     assert calls["method"] == "POST"
     assert calls["url"].endswith("/documents/upload")
     assert "files" in calls["kwargs"]
+
+
+def test_generate_jira_tasks_posts_scoped_document(monkeypatch):
+    calls = _capture(monkeypatch, FakeResponse(json_data=[{"draft_id": "d-1", "summary": "X"}]))
+    drafts = api.generate_jira_tasks("doc-1")
+    assert drafts == [{"draft_id": "d-1", "summary": "X"}]
+    assert calls["method"] == "POST"
+    assert calls["url"].endswith("/admin/jira-tasks/generate")
+    assert calls["kwargs"]["json"] == {"document_id": "doc-1"}
+
+
+def test_generate_jira_tasks_defaults_to_all_documents(monkeypatch):
+    calls = _capture(monkeypatch, FakeResponse(json_data=[]))
+    drafts = api.generate_jira_tasks()
+    assert drafts == []
+    assert calls["kwargs"]["json"] == {"document_id": None}

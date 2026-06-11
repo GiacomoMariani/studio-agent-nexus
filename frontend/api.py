@@ -79,6 +79,10 @@ def get_job(job_id: str) -> dict[str, Any]:
     return _request("GET", f"/documents/jobs/{job_id}")
 
 
+def get_document_content(document_id: str) -> dict[str, Any]:
+    return _request("GET", f"/documents/{document_id}/content")
+
+
 def delete_document(document_id: str) -> dict[str, Any]:
     return _request("DELETE", f"/documents/{document_id}")
 
@@ -112,4 +116,21 @@ def clear_query_logs() -> dict[str, Any]:
 
 def list_risks() -> list[dict[str, Any]]:
     data = _request("GET", "/risks")
+    return data if isinstance(data, list) else []
+
+
+def scan_risks() -> list[dict[str, Any]]:
+    # On-demand detection: refreshes the auto-detected findings, returns the stored set.
+    # Generous timeout — LLM detection reads every document in one pass.
+    data = _request("POST", "/admin/risks/detect", timeout=120)
+    return data if isinstance(data, list) else []
+
+
+def generate_jira_tasks(document_id: str | None = None) -> list[dict[str, Any]]:
+    # Ephemeral Jira-task drafts generated from one document (or all documents when
+    # document_id is None). Nothing is persisted; the Board renders these in-session.
+    # Generous timeout — LLM generation reads the document text in one pass.
+    data = _request(
+        "POST", "/admin/jira-tasks/generate", json={"document_id": document_id}, timeout=120
+    )
     return data if isinstance(data, list) else []

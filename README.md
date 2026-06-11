@@ -38,8 +38,8 @@ A Streamlit UI over a FastAPI backend, organised as five surfaces:
 
 - **Upload**: manage the knowledge base, ingest Markdown/PDF with chunk + status feedback.
 - **Ask**: grounded Q&A with citation cards and an explicit fallback state.
-- **Board**: fetch tasks from a document, review what's ready (with per-task GitHub/CI
-  status), run a planning pass that surfaces missing work, and track tasks by state.
+- **Board**: review a source document's tasks — what's ready, a planning pass that
+  surfaces missing work, and tracking by state (backlog / to-do / doing / done).
 - **Risks**: surface risks and cross-document contradictions, side by side with sources.
 - **Logs**: a durable audit log of every question, answer, model, and token cost.
 
@@ -101,11 +101,12 @@ sentence-transformers · google-genai · groq · OpenAI SDK · pypdf · pytest �
 
 ## Roadmap
 
-**Now:** risk and contradiction detection as a first-class agentic service, and a
-presentation-quality pass on grounded answers and citation snippets.
+**Shipped recently:** risk and contradiction detection as a first-class agentic service;
+a presentation pass on grounded answers and citation snippets; structure-aware chunking
+with a retrieval relevance floor.
 
-**Next:** structure-aware chunking with a retrieval relevance floor; LLM-backed task
-extraction and planning gap-detection to complete the document → plan pipeline.
+**Now:** LLM-backed task extraction and planning gap-detection to complete the
+document → plan pipeline.
 
 **Later:** export to external trackers (Jira / Trello / Slack) with role-based actions,
 and a per-request live-AI mode toggle for cost-controlled demos.
