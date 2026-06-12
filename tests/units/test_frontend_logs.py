@@ -10,7 +10,7 @@ if FRONTEND_DIR not in sys.path:
 from views import logs  # noqa: E402
 
 
-def test_summary_aggregates_tokens_and_fallback():
+def test_summary_aggregates_tokens_and_success_rate():
     rows = [
         {"input_tokens": 1000, "output_tokens": 200, "was_fallback": False},
         {"input_tokens": 500, "output_tokens": 100, "was_fallback": False},
@@ -20,12 +20,12 @@ def test_summary_aggregates_tokens_and_fallback():
     assert s["stored"] == 3
     assert s["tokens"] == 1000 + 200 + 500 + 100 + 50
     assert s["avg_tokens"] == 617  # 1850 / 3, rounded
-    assert s["fallback_rate"] == 33  # 1 of 3
+    assert s["success_rate"] == 67  # 2 of 3 answered without fallback
 
 
 def test_summary_empty():
     s = logs._summary([])
-    assert s == {"stored": 0, "tokens": 0, "avg_tokens": 0, "fallback_rate": 0}
+    assert s == {"stored": 0, "tokens": 0, "avg_tokens": 0, "success_rate": 100}
 
 
 def test_mode_badge_maps_provider_by_model():

@@ -90,11 +90,12 @@ def render_sidebar() -> None:
 
         st.markdown("<div class='sidebar-divider'></div>", unsafe_allow_html=True)
 
-        # Live provider indicator — answers run via Gemini.
+        # Provider-agnostic indicator — the actual model varies by config (Gemini / Groq /
+        # OpenAI / local) and is shown per-answer via the provider badge on the Ask page.
         st.markdown("<div class='sidebar-label'>AI engine</div>", unsafe_allow_html=True)
         st.markdown(
             "<div style='color:var(--success);font-size:var(--fs-small);font-weight:600;"
-            "margin-bottom:var(--sp-2)'>● Powered by Gemini</div>",
+            "margin-bottom:var(--sp-2)'>● Powered by AI</div>",
             unsafe_allow_html=True,
         )
 

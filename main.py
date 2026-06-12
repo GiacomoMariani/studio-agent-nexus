@@ -24,6 +24,11 @@ from pydantic import BaseModel, Field
 from auth import require_api_key
 from models.answering import AnswerRequest, AnswerResponse
 from models.ask_tasks import AskTaskSuggestionRequest, AskTaskSuggestionResponse
+from models.board_import import (
+    BoardImportEntityResult,
+    BoardImportRequest,
+    BoardImportResponse,
+)
 from models.chat import ChatRequest, ChatResponse
 from models.classification import ClassifyRequest, ClassifyResponse
 from models.document_qa import (
@@ -1285,6 +1290,43 @@ async def delete_risk(
         raise HTTPException(status_code=404, detail="Risk not found.")
 
     return {"risk_id": risk_id, "deleted": True}
+
+
+@app.post(
+    "/admin/board/import",
+    response_model=BoardImportResponse,
+    dependencies=[Depends(require_api_key)],
+)
+async def import_board(
+    request: BoardImportRequest,
+    review_store: ReviewStoreDependency,
+    suggestion_store: SuggestionStoreDependency,
+    risk_store: RiskStoreDependency,
+) -> BoardImportResponse:
+    # Bulk replace for the local→deployed board push (ticket-019): each entity key
+    # present in the body has its whole set erased and re-inserted; absent keys stay
+    # untouched. Pydantic validates the entire payload before this body runs, so one
+    # invalid item rejects the import (422) with nothing erased. Only the three board
+    # stores are reachable from here — documents/logs/usage cannot be affected.
+    def replace_all(store, items) -> BoardImportEntityResult:
+        deleted = len(store.list())
+        store.clear()
+        for item in items:
+            store.upsert(**item.model_dump())
+        # imported = rows now stored; duplicate ids in one payload collapse via upsert.
+        return BoardImportEntityResult(deleted=deleted, imported=len(store.list()))
+
+    return BoardImportResponse(
+        reviews=(
+            replace_all(review_store, request.reviews) if request.reviews is not None else None
+        ),
+        planning_suggestions=(
+            replace_all(suggestion_store, request.planning_suggestions)
+            if request.planning_suggestions is not None
+            else None
+        ),
+        risks=(replace_all(risk_store, request.risks) if request.risks is not None else None),
+    )
 
 
 @app.post(

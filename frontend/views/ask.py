@@ -156,13 +156,17 @@ def _render_source_download(group: dict[str, Any]) -> None:
     filename = content.get("filename", "source.txt")
     # A PDF's stored content is its extracted text, not the original binary — name it .txt.
     download_name = f"{filename}.txt" if filename.lower().endswith(".pdf") else filename
-    st.download_button(
-        "⬇  Download source",
-        data=content.get("content", ""),
-        file_name=download_name,
-        mime="text/plain",
-        key=f"dl-{document_id}",
-    )
+    # Right-aligned so it reads as a header action at the top of the source panel.
+    _, right = st.columns([3, 1])
+    with right:
+        st.download_button(
+            "⬇  Download source",
+            data=content.get("content", ""),
+            file_name=download_name,
+            mime="text/plain",
+            key=f"dl-{document_id}",
+            use_container_width=True,
+        )
 
 
 def _should_offer_tasks(item: dict[str, Any]) -> bool:
@@ -213,7 +217,12 @@ def _render_task_suggestions(item: dict[str, Any]) -> None:
     state = st.session_state.get("ask_task_suggestions")
     have_results = bool(state) and state.get("question") == question
 
-    if st.button("Find related & suggested tasks", key="find-tasks"):
+    if st.button(
+        "Find related & suggested tasks",
+        key="find-tasks",
+        type="primary",
+        icon=":material/auto_awesome:",
+    ):
         try:
             with st.spinner("Finding related and suggested tasks…"):
                 result = api.ask_task_suggestions(question, item.get("answer", ""))
@@ -278,6 +287,8 @@ def _render_answer(item: dict[str, Any]) -> None:
             fallback_notice()
             return
 
+        _render_task_suggestions(item)
+
         groups = _group_citations(item["citations"])
         if not groups:
             st.caption("No citations returned for this answer.")
@@ -293,6 +304,7 @@ def _render_answer(item: dict[str, Any]) -> None:
             marker = "".join(f"[{sid}] " for sid in group.get("source_ids") or [])
             header = f"{marker}{group['filename']}"
             with st.expander(header, expanded=(index == 0)):
+                _render_source_download(group)
                 for passage in group["passages"][:snippet_limit]:
                     page = passage.get("page_number")
                     page_label = f"  ·  p.{page}" if page else ""
@@ -307,10 +319,6 @@ def _render_answer(item: dict[str, Any]) -> None:
                         '<p style="color:var(--text-faint);margin:0">…</p>',
                         unsafe_allow_html=True,
                     )
-
-                _render_source_download(group)
-
-    _render_task_suggestions(item)
 
 
 def _pick_pending_question(

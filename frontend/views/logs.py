@@ -29,7 +29,8 @@ def _summary(logs: list[dict]) -> dict:
         "stored": stored,
         "tokens": tokens,
         "avg_tokens": (round(tokens / stored) if stored else 0),
-        "fallback_rate": (round(100 * fallbacks / stored) if stored else 0),
+        # Positive framing: share of answers handled without falling back to rule-based.
+        "success_rate": (round(100 * (stored - fallbacks) / stored) if stored else 100),
     }
 
 
@@ -117,8 +118,8 @@ def render() -> None:
             "Avg tokens / query", f"{summary['avg_tokens']:,}", "white", "tokens per answer"
         ),
         stat_card_html(
-            "Fallback rate", f"{summary['fallback_rate']}%", "white",
-            "fell back to rule-based",
+            "AI success rate", f"{summary['success_rate']}%", "green",
+            "answered without fallback",
         ),
     ]
     for col, card in zip(cols, cards, strict=False):

@@ -26,7 +26,7 @@ agentic reasoning to:
 Built on 15+ years of tech-lead experience (systems thinking, feedback loops,
 real-world constraints, tooling, iteration) applied to modern agentic AI engineering.
 
-> An example in action: [Link]
+> An example in action: [Studio Agent Nexus](https://nexus.wayrex.dev/)
 
 **[Get it running in 5 minutes](docs/quickstart.md)**
 
