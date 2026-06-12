@@ -104,6 +104,8 @@ html, body, [class*="css"] { font-family: var(--font); }
 .sidebar-credit {
     color: var(--text-faint); font-size: var(--fs-caption); margin-top: var(--sp-5);
 }
+.sidebar-credit a { color: var(--text-muted-on-dark); text-decoration: none; }
+.sidebar-credit a:hover { color: var(--accent); text-decoration: underline; }
 
 /* Nav buttons (active = primary, inactive = secondary) */
 [data-testid="stSidebar"] .stButton > button {

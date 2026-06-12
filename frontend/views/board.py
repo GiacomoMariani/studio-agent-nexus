@@ -9,8 +9,10 @@ from html import escape
 import api
 import streamlit as st
 from components import (
+    JIRA_STUB_MESSAGE,
     badge_html,
     dept_badge_html,
+    issue_type_badge,
     page_footer,
     page_header,
     placeholder,
@@ -96,17 +98,9 @@ def _suggestion_card(item: dict, can_export: bool) -> None:
 
 # --- Draft Jira tasks (ticket-017): board-top generator, ephemeral preview ---------------
 
-JIRA_STUB_MESSAGE = "Missing Project Manager pass — Jira sync not configured"
-_ISSUE_BADGE_CLASS = {
-    "Story": "badge--issue-story",
-    "Task": "badge--issue-task",
-    "Bug": "badge--issue-bug",
-    "Epic": "badge--issue-epic",
-}
-
 
 def _issue_badge(issue_type: str) -> str:
-    return badge_html(issue_type, _ISSUE_BADGE_CLASS.get(issue_type, "badge--issue-task"))
+    return issue_type_badge(issue_type)
 
 
 def _resolve_scope_document_id(selected: str, documents: list[dict]) -> str | None:

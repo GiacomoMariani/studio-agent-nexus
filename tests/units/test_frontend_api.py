@@ -113,3 +113,21 @@ def test_generate_jira_tasks_defaults_to_all_documents(monkeypatch):
     drafts = api.generate_jira_tasks()
     assert drafts == []
     assert calls["kwargs"]["json"] == {"document_id": None}
+
+
+def test_ask_task_suggestions_posts_question_and_answer(monkeypatch):
+    calls = _capture(
+        monkeypatch,
+        FakeResponse(json_data={"related": [], "suggested": [{"draft_id": "d1"}]}),
+    )
+    result = api.ask_task_suggestions("How does X work?", "Because Y.")
+    assert result == {"related": [], "suggested": [{"draft_id": "d1"}]}
+    assert calls["method"] == "POST"
+    assert calls["url"].endswith("/documents/ask/task-suggestions")
+    assert calls["kwargs"]["json"] == {"question": "How does X work?", "answer": "Because Y."}
+
+
+def test_ask_task_suggestions_defaults_answer_to_empty(monkeypatch):
+    calls = _capture(monkeypatch, FakeResponse(json_data={"related": [], "suggested": []}))
+    api.ask_task_suggestions("q only")
+    assert calls["kwargs"]["json"] == {"question": "q only", "answer": ""}

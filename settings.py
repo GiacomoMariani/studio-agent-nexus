@@ -93,6 +93,8 @@ class Settings:
     risk_detection_fallback_to_rule: bool = True
     jira_task_generator_type: str = "llm"
     jira_task_generation_fallback_to_rule: bool = True
+    ask_task_match_min_score: float = 0.3
+    ask_task_suggest_max: int = 8
     retrieval_min_score: float = 0.3
 
 
@@ -141,6 +143,18 @@ def get_settings() -> Settings:
         jira_task_generation_fallback_to_rule=_get_bool_env(
             "JIRA_TASK_GENERATION_FALLBACK_TO_RULE",
             default=True,
+        ),
+        ask_task_match_min_score=_get_float_env(
+            "ASK_TASK_MATCH_MIN_SCORE",
+            default=0.3,
+            min_value=0.0,
+            max_value=1.0,
+        ),
+        ask_task_suggest_max=_get_int_env(
+            "ASK_TASK_SUGGEST_MAX",
+            default=8,
+            min_value=1,
+            max_value=50,
         ),
         retrieval_min_score=_get_float_env(
             "RETRIEVAL_MIN_SCORE",

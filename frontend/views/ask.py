@@ -6,7 +6,16 @@ from typing import Any
 
 import api
 import streamlit as st
-from components import badge_html, fallback_notice, page_footer, page_header
+from components import (
+    JIRA_STUB_MESSAGE,
+    badge_html,
+    dept_badge_html,
+    fallback_notice,
+    issue_type_badge,
+    page_footer,
+    page_header,
+    priority_badge_html,
+)
 from fixtures import SAMPLE_QUESTIONS
 
 TOP_K = 5
@@ -156,6 +165,91 @@ def _render_source_download(group: dict[str, Any]) -> None:
     )
 
 
+def _should_offer_tasks(item: dict[str, Any]) -> bool:
+    """Offer task actions only when an LLM actually answered (not the rule fallback)."""
+    return item.get("provider", "local") != "local" and not item.get("was_fallback")
+
+
+def _render_related_task(task: dict[str, Any]) -> None:
+    score = task.get("score")
+    match = f" · match {score * 100:.0f}%" if isinstance(score, (int, float)) else ""
+    st.markdown(
+        '<div class="card" style="margin-bottom:var(--sp-2)">'
+        '<div style="display:flex;gap:var(--sp-2);align-items:center;flex-wrap:wrap">'
+        f'{dept_badge_html(task.get("department", ""))}'
+        f'{priority_badge_html(task.get("priority", ""))}'
+        f'<span style="font-weight:600;color:var(--text-on-light)">'
+        f'{escape(task.get("title", ""))}</span></div>'
+        f'<div class="muted-caption" style="margin-top:4px">{escape(task.get("kind", ""))}'
+        f"{match}</div></div>",
+        unsafe_allow_html=True,
+    )
+
+
+def _suggested_task_card(draft: dict[str, Any]) -> None:
+    with st.container(border=True):
+        st.markdown(
+            '<div style="display:flex;gap:var(--sp-2);align-items:center;flex-wrap:wrap">'
+            f'{issue_type_badge(draft.get("issue_type", ""))}'
+            f'{priority_badge_html(draft.get("priority", ""))}'
+            f'{dept_badge_html(draft.get("department", ""))}</div>'
+            f'<div style="font-weight:600;color:var(--text-on-dark);margin-top:var(--sp-2)">'
+            f'{escape(draft.get("summary", ""))}</div>'
+            f'<div style="color:var(--text-muted-on-dark);font-size:0.875rem;margin-top:4px">'
+            f'{escape(draft.get("description", ""))}</div>',
+            unsafe_allow_html=True,
+        )
+        if st.button("Confirm on Jira", key=f"ask-jira-{draft.get('draft_id', '')}"):
+            # Deliberate stub — no Jira connection, no persistence (ticket-017/018).
+            st.warning(JIRA_STUB_MESSAGE)
+
+
+def _render_task_suggestions(item: dict[str, Any]) -> None:
+    """LLM-gated: a button that pulls related existing tasks + suggested new drafts."""
+    if not _should_offer_tasks(item):
+        return
+
+    question = item.get("question", "")
+    state = st.session_state.get("ask_task_suggestions")
+    have_results = bool(state) and state.get("question") == question
+
+    if st.button("Find related & suggested tasks", key="find-tasks"):
+        try:
+            with st.spinner("Finding related and suggested tasks…"):
+                result = api.ask_task_suggestions(question, item.get("answer", ""))
+        except api.ApiError as exc:
+            st.error(str(exc))
+            return
+        st.session_state["ask_task_suggestions"] = {"question": question, **result}
+        st.rerun()
+
+    if not have_results:
+        return
+
+    related = state.get("related", [])
+    suggested = state.get("suggested", [])
+
+    if related:
+        st.markdown(
+            '<div class="kicker" style="margin-top:var(--sp-4)">Related tasks</div>',
+            unsafe_allow_html=True,
+        )
+        for task in related:
+            _render_related_task(task)
+
+    if suggested:
+        st.markdown(
+            '<div class="kicker" style="margin-top:var(--sp-4)">Suggested new tasks</div>',
+            unsafe_allow_html=True,
+        )
+        st.caption("Drafts — not saved.")
+        for draft in suggested:
+            _suggested_task_card(draft)
+
+    if not related and not suggested:
+        st.caption("No related or suggested tasks for this question.")
+
+
 def _render_answer(item: dict[str, Any]) -> None:
     mode_badge = _provider_badge(item.get("provider", "local"))
 
@@ -215,6 +309,8 @@ def _render_answer(item: dict[str, Any]) -> None:
                     )
 
                 _render_source_download(group)
+
+    _render_task_suggestions(item)
 
 
 def _pick_pending_question(

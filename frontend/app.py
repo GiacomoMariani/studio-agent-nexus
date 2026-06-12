@@ -112,7 +112,9 @@ def render_sidebar() -> None:
         )
 
         st.markdown(
-            "<div class='sidebar-credit'>Built by Giacomo Mariani</div>",
+            "<div class='sidebar-credit'>Built by Giacomo Mariani · "
+            "<a href='https://github.com/GiacomoMariani/studio-agent-nexus' "
+            "target='_blank' rel='noopener'>View source ↗</a></div>",
             unsafe_allow_html=True,
         )
 

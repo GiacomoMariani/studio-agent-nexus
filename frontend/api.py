@@ -134,3 +134,15 @@ def generate_jira_tasks(document_id: str | None = None) -> list[dict[str, Any]]:
         "POST", "/admin/jira-tasks/generate", json={"document_id": document_id}, timeout=120
     )
     return data if isinstance(data, list) else []
+
+
+def ask_task_suggestions(question: str, answer: str = "") -> dict[str, Any]:
+    # Ephemeral, LLM-gated: related existing board tasks + suggested new Jira drafts for an
+    # Ask-page answer. Nothing is persisted. Returns {"related": [...], "suggested": [...]}.
+    data = _request(
+        "POST",
+        "/documents/ask/task-suggestions",
+        json={"question": question, "answer": answer},
+        timeout=120,
+    )
+    return data if isinstance(data, dict) else {"related": [], "suggested": []}

@@ -127,6 +127,14 @@ def test_pick_pending_question_blocks_while_running():
     assert ask._pick_pending_question(True, False, "", "demo q") is None
 
 
+def test_should_offer_tasks_only_for_llm_non_fallback():
+    # The "Find related & suggested tasks" affordance is LLM-only and never on a fallback.
+    assert ask._should_offer_tasks({"provider": "gemini", "was_fallback": False}) is True
+    assert ask._should_offer_tasks({"provider": "local", "was_fallback": False}) is False
+    assert ask._should_offer_tasks({"provider": "openai", "was_fallback": True}) is False
+    assert ask._should_offer_tasks({}) is False
+
+
 def test_pick_pending_question_picks_typed_then_sample():
     assert ask._pick_pending_question(False, True, "  typed q  ", None) == "typed q"
     assert ask._pick_pending_question(False, False, "", "demo q") == "demo q"

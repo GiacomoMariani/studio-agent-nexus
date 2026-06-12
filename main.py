@@ -23,6 +23,7 @@ from pydantic import BaseModel, Field
 
 from auth import require_api_key
 from models.answering import AnswerRequest, AnswerResponse
+from models.ask_tasks import AskTaskSuggestionRequest, AskTaskSuggestionResponse
 from models.chat import ChatRequest, ChatResponse
 from models.classification import ClassifyRequest, ClassifyResponse
 from models.document_qa import (
@@ -78,6 +79,7 @@ from models.usage import (
 from providers.embedding_provider import embedding_provider
 from services.answerer_factory import get_answerer
 from services.answering_service import AnsweringService
+from services.ask_task_suggestion_service import AskTaskSuggestionService
 from services.chat_service import ChatService
 from services.chatbot_factory import get_chatbot
 from services.classification_service import ClassificationService
@@ -110,6 +112,7 @@ from services.planning_suggestion_store import (
     SQLiteSuggestionStore,
     sqlite_suggestion_store,
 )
+from services.related_task_service import RelatedTaskService
 from services.retrieval_service import RetrievalService
 from services.review_store import SQLiteReviewStore, sqlite_review_store
 from services.risk_detection_service import RiskDetectionService
@@ -453,6 +456,26 @@ def get_jira_task_generation_service() -> JiraTaskGenerationService:
 JiraTaskGenerationServiceDependency = Annotated[
     JiraTaskGenerationService,
     Depends(get_jira_task_generation_service),
+]
+
+
+def get_ask_task_suggestion_service() -> AskTaskSuggestionService:
+    settings = get_settings()
+    return AskTaskSuggestionService(
+        review_store=sqlite_review_store,
+        suggestion_store=sqlite_suggestion_store,
+        related_service=RelatedTaskService(
+            embedding_provider=embedding_provider,
+            min_score=settings.ask_task_match_min_score,
+        ),
+        generator=get_jira_task_generator(settings),
+        suggest_max=settings.ask_task_suggest_max,
+    )
+
+
+AskTaskSuggestionServiceDependency = Annotated[
+    AskTaskSuggestionService,
+    Depends(get_ask_task_suggestion_service),
 ]
 
 
@@ -1305,3 +1328,25 @@ async def generate_jira_tasks(
 )
 async def get_jira_tasks_schema() -> dict:
     return jira_task_schema()
+
+
+@app.post(
+    "/documents/ask/task-suggestions",
+    response_model=AskTaskSuggestionResponse,
+    dependencies=[Depends(require_api_key)],
+)
+async def ask_task_suggestions(
+    request: AskTaskSuggestionRequest,
+    service: AskTaskSuggestionServiceDependency,
+) -> AskTaskSuggestionResponse:
+    # Ephemeral, LLM-gated affordance from the Ask page: related existing board tasks
+    # (local-embedding match, no tokens) + suggested new Jira drafts (ticket-017 generator).
+    # Nothing is persisted.
+    try:
+        result = await service.suggest(question=request.question, answer=request.answer)
+    except AppServiceError as ex:
+        raise HTTPException(status_code=500, detail=str(ex)) from ex
+
+    return AskTaskSuggestionResponse(
+        related=result["related"], suggested=result["suggested"]
+    )

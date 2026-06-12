@@ -25,6 +25,20 @@ def priority_badge_html(level: str) -> str:
     return f'<span class="badge badge--{escape(level.lower())}">{escape(level)}</span>'
 
 
+# Jira draft helpers (ticket-017 / 018) — shared by the Board generator and the Ask page.
+JIRA_STUB_MESSAGE = "Missing Project Manager pass — Jira sync not configured"
+_ISSUE_BADGE_CLASS = {
+    "Story": "badge--issue-story",
+    "Task": "badge--issue-task",
+    "Bug": "badge--issue-bug",
+    "Epic": "badge--issue-epic",
+}
+
+
+def issue_type_badge(issue_type: str) -> str:
+    return badge_html(issue_type, _ISSUE_BADGE_CLASS.get(issue_type, "badge--issue-task"))
+
+
 def skill_badge_html(text: str) -> str:
     return f'<span class="skill-badge">{escape(text)}</span>'
 

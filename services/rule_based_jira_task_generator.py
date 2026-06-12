@@ -78,7 +78,7 @@ def _sentences(text: str) -> list[str]:
             continue
         kept.append(line)
     joined = re.sub(r"\s+", " ", " ".join(kept)).strip()
-    return [s.strip() for s in re.split(r"(?<=[.;])\s+", joined) if s.strip()]
+    return [s.strip() for s in re.split(r"(?<=[.;?!])\s+", joined) if s.strip()]
 
 
 def _shorten(text: str, limit: int = 90) -> str:
